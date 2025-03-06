@@ -189,7 +189,7 @@ public class TradeAura extends Module {
     );
 	
 	private final Setting<Integer> ticks_to_close = sgGeneral.add(new IntSetting.Builder()
-        .name("ticks_to_close")
+        .name("Ticks-to-close")
         .description("time before closing villager window in ticks")
         .defaultValue(2)
         .min(0)
@@ -224,7 +224,7 @@ public class TradeAura extends Module {
     );
 	
 	private final Setting<Integer> ticks_to_wait = sgAura.add(new IntSetting.Builder()
-        .name("ticks_to_wait")
+        .name("Ticks-to-wait")
         .description("time before clicking another villager window in ticks")
         .defaultValue(1)
         .min(0)
