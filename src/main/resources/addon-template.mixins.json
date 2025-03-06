@@ -1,0 +1,11 @@
+{
+  "required": false,
+  "package": "com.TradeAura.addon.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "ExampleMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
