@@ -8,6 +8,7 @@ import meteordevelopment.meteorclient.systems.modules.Module;
 
 import static com.example.addon.Utils.*; 
 
+import net.minecraft.network.packet.c2s.play.*;
 import meteordevelopment.meteorclient.events.game.OpenScreenEvent;
 import meteordevelopment.meteorclient.events.packets.PacketEvent;
 
@@ -19,7 +20,7 @@ import meteordevelopment.orbit.EventHandler;
 
 import java.lang.reflect.Field;
 import meteordevelopment.meteorclient.MeteorClient;
-
+import net.minecraft.util.ActionResult;
 import meteordevelopment.meteorclient.settings.*;
 
 import meteordevelopment.meteorclient.utils.player.FindItemResult;
@@ -71,15 +72,93 @@ import net.minecraft.entity.LivingEntity;
 import net.minecraft.util.Hand;
 import java.util.HashMap;
 import java.util.Map;
+import net.minecraft.util.math.Vec3d;
+import meteordevelopment.meteorclient.utils.player.Rotations;
 
 import meteordevelopment.meteorclient.utils.render.color.Color;
 import meteordevelopment.meteorclient.utils.render.color.SettingColor;
 import meteordevelopment.meteorclient.events.render.Render3DEvent;
+import net.minecraft.entity.Entity;
 
 import net.minecraft.util.Pair;
 import meteordevelopment.meteorclient.renderer.ShapeMode;
 
 import static com.example.addon.Utils.*; 
+
+
+
+// todo: delete useless imports
+import it.unimi.dsi.fastutil.objects.ObjectIntImmutablePair;
+import meteordevelopment.meteorclient.MeteorClient;
+import meteordevelopment.meteorclient.events.entity.player.InteractEntityEvent;
+import meteordevelopment.meteorclient.events.entity.player.StartBreakingBlockEvent;
+import meteordevelopment.meteorclient.events.packets.PacketEvent;
+import meteordevelopment.meteorclient.events.world.TickEvent;
+import meteordevelopment.meteorclient.gui.GuiTheme;
+import meteordevelopment.meteorclient.gui.widgets.WWidget;
+import meteordevelopment.meteorclient.gui.widgets.containers.WHorizontalList;
+import meteordevelopment.meteorclient.gui.widgets.containers.WSection;
+import meteordevelopment.meteorclient.gui.widgets.containers.WTable;
+import meteordevelopment.meteorclient.gui.widgets.containers.WVerticalList;
+import meteordevelopment.meteorclient.gui.widgets.input.WDropdown;
+import meteordevelopment.meteorclient.gui.widgets.input.WIntEdit;
+import meteordevelopment.meteorclient.gui.widgets.input.WTextBox;
+import meteordevelopment.meteorclient.gui.widgets.pressable.WButton;
+import meteordevelopment.meteorclient.gui.widgets.pressable.WCheckbox;
+import meteordevelopment.meteorclient.gui.widgets.pressable.WMinus;
+import meteordevelopment.meteorclient.pathing.BaritoneUtils;
+import meteordevelopment.meteorclient.settings.*;
+import meteordevelopment.meteorclient.systems.modules.Categories;
+import meteordevelopment.meteorclient.systems.modules.Module;
+import meteordevelopment.meteorclient.utils.misc.ISerializable;
+import meteordevelopment.meteorclient.utils.misc.Names;
+import meteordevelopment.orbit.EventHandler;
+import meteordevelopment.orbit.EventPriority;
+import net.minecraft.block.Block;
+import net.minecraft.block.Blocks;
+import net.minecraft.client.sound.PositionedSoundInstance;
+import net.minecraft.component.DataComponentTypes;
+import net.minecraft.enchantment.Enchantment;
+import net.minecraft.enchantment.EnchantmentHelper;
+import net.minecraft.enchantment.EnchantmentLevelEntry;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.passive.VillagerEntity;
+import net.minecraft.entity.projectile.ProjectileUtil;
+import net.minecraft.item.ItemStack;
+import net.minecraft.item.Items;
+import net.minecraft.nbt.NbtCompound;
+import net.minecraft.nbt.NbtElement;
+import net.minecraft.nbt.NbtIo;
+import net.minecraft.nbt.NbtList;
+import net.minecraft.network.packet.s2c.common.DisconnectS2CPacket;
+import net.minecraft.network.packet.s2c.play.SetTradeOffersS2CPacket;
+import net.minecraft.registry.Registry;
+import net.minecraft.registry.RegistryKeys;
+import net.minecraft.registry.entry.RegistryEntry;
+import net.minecraft.registry.tag.EnchantmentTags;
+import net.minecraft.sound.SoundEvent;
+import net.minecraft.sound.SoundEvents;
+import net.minecraft.text.MutableText;
+import net.minecraft.text.Text;
+import net.minecraft.util.ActionResult;
+import net.minecraft.util.Hand;
+import net.minecraft.util.Identifier;
+import net.minecraft.util.hit.EntityHitResult;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.village.TradeOffer;
+import net.minecraft.village.TradeOfferList;
+import net.minecraft.village.VillagerProfession;
+import org.apache.commons.io.FilenameUtils;
+
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.DirectoryStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.*;
+
+
 
 public class TradeAura extends Module {
 
@@ -389,6 +468,41 @@ public class TradeAura extends Module {
         
     }
 	
+	public void lookAtVillager(Vec3d playerPos, Vec3d villagerPos) {
+        Vec3d direction = villagerPos.subtract(playerPos).normalize();
+        double yaw = Math.toDegrees(Math.atan2(direction.z, direction.x)) - 90;
+        double pitch = Math.toDegrees(-Math.atan2(direction.y, Math.sqrt(direction.x * direction.x + direction.z * direction.z)));
+
+        // Add some random noise to prevent anticheat detection
+        yaw += (Math.random() - 0.5) * 2;
+        pitch += (Math.random() - 0.5) * 2;
+
+        Rotations.rotate(yaw, pitch);
+    }
+	
+	public void VillagerInteract(Entity villager) {
+        
+		Vec3d playerPos = mc.player.getEyePos();
+		Vec3d villagerPos = villager.getEyePos();
+		EntityHitResult entityHitResult = ProjectileUtil.raycast(mc.player, playerPos, villagerPos, villager.getBoundingBox(), Entity::canHit, playerPos.squaredDistanceTo(villagerPos));
+		if (entityHitResult == null) {
+			// Raycast didn't find villager entity?
+			ActionResult actionResultDirect = mc.interactionManager.interactEntity(mc.player, villager, Hand.MAIN_HAND);
+			if (Debug.get()) info("Raycast didn't find a target");
+		} else {
+			
+			lookAtVillager(playerPos, villagerPos);
+			
+
+			ActionResult actionResult = mc.interactionManager.interactEntityAtLocation(mc.player, villager, entityHitResult, Hand.MAIN_HAND);
+			if (!actionResult.isAccepted()) {
+				ActionResult actionResultDirect = mc.interactionManager.interactEntity(mc.player, villager, Hand.MAIN_HAND);
+				if (Debug.get()) info("Action wasn't accepted");
+			}
+		}
+        
+    }
+	
 	@EventHandler
     private void onTick(TickEvent.Pre event) {
         if (!mc.player.isAlive() || PlayerUtils.getGameMode() == GameMode.SPECTATOR) return;
@@ -414,8 +528,12 @@ public class TradeAura extends Module {
 			if (!VillagerCooldown.containsKey(targett)){
 				remember_entity = targett;
 				VillagerCooldown.put(targett, new Pair<>(0, defaultColor.get()) );
-				mc.interactionManager.interactEntity(mc.player, targett, Hand.MAIN_HAND);
+				//mc.interactionManager.interactEntity(mc.player, targett, Hand.MAIN_HAND);
+				//mc.player.swingHand(Hand.MAIN_HAND);
 				
+				//mc.player.networkHandler.sendPacket(PlayerInteractEntityC2SPacket.interact(targett, mc.player.isSneaking(), Hand.MAIN_HAND));
+				
+				VillagerInteract(targett);
 				break;
 			}
 				
