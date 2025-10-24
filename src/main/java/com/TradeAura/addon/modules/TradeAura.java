@@ -208,6 +208,15 @@ public class TradeAura extends Module {
         .sliderMax(65)
         .build()
     );
+
+	private final Setting<Integer> MaxSellPrice = sgGeneral.add(new IntSetting.Builder()
+        .name("Max-Sell-Price")
+        .description("Max Price (in any items) for a deal")
+        .defaultValue(65)
+        .min(0)
+        .sliderMax(65)
+        .build()
+    );
 	
 	private final Setting<List<Item>> items = sgGeneral.add(new ItemListSetting.Builder()
         .name("items")
@@ -414,6 +423,12 @@ public class TradeAura extends Module {
 				
 					if (emeralds.isOf(Items.EMERALD) && emeralds.getCount() > MaxPrice.get()){
 						if (Debug.get()) info(offer.getSellItem().toString() + " too expensive " + emeralds.getCount());
+						updateColor(TooExpensiveColor.get());
+						continue;
+					}
+
+					if (!emeralds.isOf(Items.EMERALD) && emeralds.getCount() > MaxSellPrice.get()){
+						if (Debug.get()) info(emeralds.toString() + " too high to sell " + emeralds.getCount());
 						updateColor(TooExpensiveColor.get());
 						continue;
 					}
