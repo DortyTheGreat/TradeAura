@@ -5,14 +5,15 @@ import meteordevelopment.meteorclient.events.packets.PacketEvent;
 import meteordevelopment.meteorclient.events.render.Render3DEvent;
 import meteordevelopment.meteorclient.events.world.TickEvent;
 import meteordevelopment.meteorclient.gui.GuiTheme;
+import meteordevelopment.meteorclient.gui.widgets.WItemWithLabel;
 import meteordevelopment.meteorclient.gui.widgets.WWidget;
 import meteordevelopment.meteorclient.gui.widgets.containers.WSection;
 import meteordevelopment.meteorclient.gui.widgets.containers.WTable;
 import meteordevelopment.meteorclient.gui.widgets.containers.WVerticalList;
 import meteordevelopment.meteorclient.gui.widgets.input.WIntEdit;
 import meteordevelopment.meteorclient.gui.widgets.input.WTextBox;
-import meteordevelopment.meteorclient.gui.widgets.pressable.WButton;
 import meteordevelopment.meteorclient.gui.widgets.pressable.WMinus;
+import meteordevelopment.meteorclient.gui.widgets.pressable.WPlus;
 import meteordevelopment.meteorclient.settings.*;
 import meteordevelopment.meteorclient.systems.modules.Category;
 import meteordevelopment.meteorclient.systems.modules.Module;
@@ -62,7 +63,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 public class TradeAura extends Module {
 
@@ -101,7 +101,6 @@ public class TradeAura extends Module {
             .build()
     );
 
-    // Custom Data Structures for Rules
     public static class TradeRule {
         public List<Item> items = new ArrayList<>();
         public int value1; // Buy: maxBuyPrice | Sell: maxSellQuantity
@@ -121,11 +120,10 @@ public class TradeAura extends Module {
     private void rebuildGui(GuiTheme theme, WVerticalList rootList) {
         rootList.clear();
 
-        // BUY RULES
         WSection buySection = rootList.add(theme.section("Buy Rules", true)).expandX().widget();
         WTable buyTable = buySection.add(theme.table()).expandX().widget();
         
-        buyTable.add(theme.label("Items (comma separated)")).expandX();
+        buyTable.add(theme.label("Items")).expandX();
         buyTable.add(theme.label("Max Price")).minWidth(70);
         buyTable.add(theme.label("Buy Limit")).minWidth(70);
         buyTable.add(theme.label(""));
@@ -145,11 +143,10 @@ public class TradeAura extends Module {
 
         rootList.add(theme.horizontalSeparator()).expandX();
 
-        // SELL RULES
         WSection sellSection = rootList.add(theme.section("Sell Rules", true)).expandX().widget();
         WTable sellTable = sellSection.add(theme.table()).expandX().widget();
         
-        sellTable.add(theme.label("Items (comma separated)")).expandX();
+        sellTable.add(theme.label("Items")).expandX();
         sellTable.add(theme.label("Max Sell Qty")).minWidth(70);
         sellTable.add(theme.label("Emerald Limit")).minWidth(70);
         sellTable.add(theme.label(""));
@@ -169,35 +166,42 @@ public class TradeAura extends Module {
     }
 
     private void addRuleRow(GuiTheme theme, WTable table, TradeRule rule, boolean isSell, WVerticalList rootList) {
-        String itemsStr = rule.items.stream()
-            .map(i -> Registries.ITEM.getId(i).toString())
-            .collect(Collectors.joining(", "));
-        
-        WTextBox itemsBox = table.add(theme.textBox(itemsStr)).expandX().widget();
-        itemsBox.tooltip = "Enter item IDs or names separated by comma (e.g. minecraft:diamond, emerald)";
-        itemsBox.action = () -> {
-            rule.items.clear();
-            for (String s : itemsBox.get().split(",")) {
-                String trimmed = s.trim();
-                if (!trimmed.isEmpty()) {
-                    Identifier id = Identifier.tryParse(trimmed);
-                    Item item = null;
-                    if (id != null && Registries.ITEM.containsId(id)) {
-                        item = Registries.ITEM.get(id);
-                    } else {
-                        for (Item regItem : Registries.ITEM) {
-                            if (regItem.getName().getString().equalsIgnoreCase(trimmed)) {
-                                item = regItem;
-                                break;
-                            }
+        WTable itemsTable = table.add(theme.table()).expandX().widget();
+
+        for (Item item : rule.items) {
+            itemsTable.add(theme.itemWithLabel(new ItemStack(item))).widget();
+            itemsTable.add(theme.minus()).widget().action = () -> {
+                rule.items.remove(item);
+                rebuildGui(theme, rootList);
+            };
+            itemsTable.row();
+        }
+
+        WTextBox newItemBox = itemsTable.add(theme.textBox("")).expandX().widget();
+        newItemBox.tooltip = "Enter item ID or name (e.g. minecraft:diamond or diamond)";
+        WPlus addBtn = itemsTable.add(theme.plus()).widget();
+        addBtn.action = () -> {
+            String trimmed = newItemBox.get().trim();
+            if (!trimmed.isEmpty()) {
+                Identifier id = Identifier.tryParse(trimmed);
+                Item item = null;
+                if (id != null && Registries.ITEM.containsId(id)) {
+                    item = Registries.ITEM.get(id);
+                } else {
+                    for (Item regItem : Registries.ITEM) {
+                        if (regItem.getName().getString().equalsIgnoreCase(trimmed)) {
+                            item = regItem;
+                            break;
                         }
                     }
-                    if (item != null) rule.items.add(item);
+                }
+                if (item != null && !rule.items.contains(item)) {
+                    rule.items.add(item);
+                    rebuildGui(theme, rootList);
                 }
             }
         };
 
-        // ИСПРАВЛЕНО: Добавлен параметр false, отключающий слайдер
         WIntEdit val1Edit = table.add(theme.intEdit(rule.value1, -1, 10000, false)).minWidth(70).widget();
         val1Edit.action = () -> rule.value1 = val1Edit.get();
 
@@ -214,7 +218,6 @@ public class TradeAura extends Module {
         table.row();
     }
 
-    // Saving/Loading custom rules via NBT
     @Override
     public NbtCompound toTag() {
         NbtCompound tag = super.toTag();
@@ -223,14 +226,20 @@ public class TradeAura extends Module {
         return tag;
     }
 
-    // ИСПРАВЛЕНО: Возвращаем Module вместо NbtCompound для совместимости с ISerializable
+    // БЕЗОПАСНОЕ ЧТЕНИЕ NBT (исправляет краш на новых версиях)
     @Override
     public Module fromTag(NbtCompound tag) {
         super.fromTag(tag);
         buyRules.clear();
         sellRules.clear();
-        if (tag.contains("buyRules")) rulesFromTag(tag.getList("buyRules", NbtElement.COMPOUND_TYPE), buyRules);
-        if (tag.contains("sellRules")) rulesFromTag(tag.getList("sellRules", NbtElement.COMPOUND_TYPE), sellRules);
+        
+        if (tag.get("buyRules") instanceof NbtList buyList) {
+            rulesFromTag(buyList, buyRules);
+        }
+        if (tag.get("sellRules") instanceof NbtList sellList) {
+            rulesFromTag(sellList, sellRules);
+        }
+        
         return this;
     }
 
@@ -251,25 +260,32 @@ public class TradeAura extends Module {
         return list;
     }
 
-    private void rulesFromTag(NbtList list, List<TradeRule> rules) {
-        for (NbtElement element : list) {
-            if (element instanceof NbtCompound ruleTag) {
-                TradeRule rule = new TradeRule();
-                NbtList itemsList = ruleTag.getList("items", NbtElement.STRING_TYPE);
-                for (NbtElement itemElement : itemsList) {
-                    String idStr = itemElement.asString();
-                    Identifier id = Identifier.tryParse(idStr);
-                    if (id != null && Registries.ITEM.containsId(id)) {
-                        rule.items.add(Registries.ITEM.get(id));
-                    }
-                }
-                rule.value1 = ruleTag.getInt("value1");
-                rule.value2 = ruleTag.getInt("value2");
-                rules.add(rule);
-            }
-        }
+	private void rulesFromTag(NbtList list, List<TradeRule> rules) {
+		for (NbtElement element : list) {
+			if (element instanceof NbtCompound ruleTag) {
+				TradeRule rule = new TradeRule();
+				
+				if (ruleTag.get("items") instanceof NbtList itemsList) {
+					for (NbtElement itemElement : itemsList) {
+						if (itemElement instanceof NbtString itemString) {
+							// ИСПРАВЛЕНО: asString() теперь возвращает Optional<String>
+							itemString.asString().ifPresent(idStr -> {
+								Identifier id = Identifier.tryParse(idStr);
+								if (id != null && Registries.ITEM.containsId(id)) {
+									rule.items.add(Registries.ITEM.get(id));
+								}
+							});
+						}
+					}
+				}
+				
+				// ИСПРАВЛЕНО: getInt() теперь возвращает Optional<Integer>
+				rule.value1 = ruleTag.getInt("value1").orElse(-1);
+				rule.value2 = ruleTag.getInt("value2").orElse(-1);
+				rules.add(rule);
+			}
+		}
     }
-
 
     private final Setting<Boolean> aura = sgAura.add(new BoolSetting.Builder()
             .name("Villager-Aura")
@@ -499,7 +515,6 @@ public class TradeAura extends Module {
 
                     if (sellRule == null) continue;
 
-                    // value1 = maxSellQuantity
                     if (sellRule.value1 != -1 && payItem.getCount() > sellRule.value1) {
                         if (Debug.get())
                             info(payItem.getName().getString() + " sell quantity too high: " + payItem.getCount() + " > " + sellRule.value1);
@@ -507,7 +522,6 @@ public class TradeAura extends Module {
                         continue;
                     }
 
-                    // value2 = emeraldSellLimit
                     if (sellRule.value2 != -1) {
                         int emeraldCount = countItemInInventory(Items.EMERALD);
                         if (emeraldCount >= sellRule.value2) {
@@ -539,7 +553,6 @@ public class TradeAura extends Module {
                     continue;
                 }
 
-                // Normal purchase
                 TradeRule buyRule = null;
                 for (TradeRule rule : buyRules) {
                     if (rule.items.contains(sellItem.getItem())) {
@@ -549,7 +562,6 @@ public class TradeAura extends Module {
                 }
 
                 if (buyRule != null) {
-                    // value1 = maxBuyPrice
                     if (payItem.isOf(Items.EMERALD) && payItem.getCount() > buyRule.value1) {
                         if (Debug.get())
                             info(offer.getSellItem().getName().getString() + " too expensive " + payItem.getCount());
@@ -557,7 +569,6 @@ public class TradeAura extends Module {
                         continue;
                     }
 
-                    // value2 = buyLimit
                     if (buyRule.value2 != -1) {
                         int currentCount = countItemInInventory(sellItem.getItem());
                         if (currentCount >= buyRule.value2) {
