@@ -26,7 +26,6 @@ import meteordevelopment.meteorclient.renderer.ShapeMode;
 import meteordevelopment.orbit.EventHandler;
 
 import net.minecraft.client.gui.screen.ingame.MerchantScreen;
-import net.minecraft.client.MinecraftClient;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.passive.VillagerEntity;
@@ -53,6 +52,7 @@ import net.minecraft.util.math.Vec3d;
 import net.minecraft.village.Merchant;
 import net.minecraft.village.TradeOffer;
 import net.minecraft.village.TradeOfferList;
+import net.minecraft.village.VillagerProfession;
 import net.minecraft.world.GameMode;
 import org.apache.commons.lang3.reflect.FieldUtils;
 
@@ -60,12 +60,115 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public class TradeAura extends Module {
 
     private final SettingGroup sgGeneral = settings.getDefaultGroup();
     private final SettingGroup sgAura = settings.createGroup("Aura");
     private final SettingGroup sgRender = settings.createGroup("Render");
+
+    // --- ХАРДКОД ТРЕЙДОВ ЖИТЕЛЕЙ ---
+    private static final Map<Item, Set<String>> VILLAGER_BUYS = new HashMap<>();
+    private static final Map<Item, Set<String>> VILLAGER_SELLS = new HashMap<>();
+
+    static {
+        // Продажа (житель покупает у нас)
+        VILLAGER_BUYS.put(Items.WHEAT, Set.of("farmer"));
+        VILLAGER_BUYS.put(Items.POTATO, Set.of("farmer"));
+        VILLAGER_BUYS.put(Items.CARROT, Set.of("farmer"));
+        VILLAGER_BUYS.put(Items.BEETROOT, Set.of("farmer"));
+        VILLAGER_BUYS.put(Items.PUMPKIN, Set.of("farmer"));
+        VILLAGER_BUYS.put(Items.MELON_SLICE, Set.of("farmer"));
+        
+        VILLAGER_BUYS.put(Items.PAPER, Set.of("cartographer", "librarian"));
+        VILLAGER_BUYS.put(Items.GLASS_PANE, Set.of("cartographer"));
+        VILLAGER_BUYS.put(Items.COMPASS, Set.of("cartographer"));
+        VILLAGER_BUYS.put(Items.BOOK, Set.of("librarian"));
+        VILLAGER_BUYS.put(Items.INK_SAC, Set.of("librarian"));
+        
+        VILLAGER_BUYS.put(Items.STRING, Set.of("fletcher"));
+        VILLAGER_BUYS.put(Items.FEATHER, Set.of("fletcher"));
+        VILLAGER_BUYS.put(Items.STICK, Set.of("fletcher"));
+        VILLAGER_BUYS.put(Items.FLINT, Set.of("fletcher"));
+        
+        VILLAGER_BUYS.put(Items.RAW_IRON, Set.of("armorer"));
+        VILLAGER_BUYS.put(Items.RAW_GOLD, Set.of("armorer"));
+        VILLAGER_BUYS.put(Items.RAW_COPPER, Set.of("armorer"));
+        VILLAGER_BUYS.put(Items.COAL, Set.of("armorer", "weaponsmith", "toolsmith"));
+        VILLAGER_BUYS.put(Items.LAPIS_LAZULI, Set.of("cleric"));
+        VILLAGER_BUYS.put(Items.REDSTONE, Set.of("cleric"));
+        
+        VILLAGER_BUYS.put(Items.LEATHER, Set.of("leatherworker"));
+        VILLAGER_BUYS.put(Items.RABBIT_HIDE, Set.of("leatherworker"));
+        VILLAGER_BUYS.put(Items.TURTLE_SCUTE, Set.of("leatherworker"));
+        
+        VILLAGER_BUYS.put(Items.MUTTON, Set.of("butcher"));
+        VILLAGER_BUYS.put(Items.PORKCHOP, Set.of("butcher"));
+        VILLAGER_BUYS.put(Items.CHICKEN, Set.of("butcher"));
+        VILLAGER_BUYS.put(Items.BEEF, Set.of("butcher"));
+        
+        VILLAGER_BUYS.put(Items.CLAY_BALL, Set.of("mason"));
+        VILLAGER_BUYS.put(Items.STONE, Set.of("mason"));
+        VILLAGER_BUYS.put(Items.GRANITE, Set.of("mason"));
+        VILLAGER_BUYS.put(Items.ANDESITE, Set.of("mason"));
+        VILLAGER_BUYS.put(Items.DIORITE, Set.of("mason"));
+
+        // Покупка (житель продает нам)
+        VILLAGER_SELLS.put(Items.BREAD, Set.of("farmer"));
+        VILLAGER_SELLS.put(Items.APPLE, Set.of("farmer"));
+        VILLAGER_SELLS.put(Items.PUMPKIN_PIE, Set.of("farmer"));
+        
+        VILLAGER_SELLS.put(Items.GLASS, Set.of("librarian"));
+        VILLAGER_SELLS.put(Items.ENCHANTED_BOOK, Set.of("librarian"));
+        VILLAGER_SELLS.put(Items.BOOKSHELF, Set.of("librarian"));
+        VILLAGER_SELLS.put(Items.NAME_TAG, Set.of("librarian"));
+        
+        VILLAGER_SELLS.put(Items.MAP, Set.of("cartographer"));
+        VILLAGER_SELLS.put(Items.FILLED_MAP, Set.of("cartographer"));
+        VILLAGER_SELLS.put(Items.ITEM_FRAME, Set.of("cartographer"));
+        VILLAGER_SELLS.put(Items.CARTOGRAPHY_TABLE, Set.of("cartographer"));
+        
+        VILLAGER_SELLS.put(Items.ARROW, Set.of("fletcher"));
+        VILLAGER_SELLS.put(Items.BOW, Set.of("fletcher"));
+        VILLAGER_SELLS.put(Items.CROSSBOW, Set.of("fletcher"));
+        VILLAGER_SELLS.put(Items.FLINT_AND_STEEL, Set.of("fletcher"));
+        
+        VILLAGER_SELLS.put(Items.IRON_HELMET, Set.of("armorer"));
+        VILLAGER_SELLS.put(Items.IRON_CHESTPLATE, Set.of("armorer"));
+        VILLAGER_SELLS.put(Items.IRON_LEGGINGS, Set.of("armorer"));
+        VILLAGER_SELLS.put(Items.IRON_BOOTS, Set.of("armorer"));
+        VILLAGER_SELLS.put(Items.SHIELD, Set.of("armorer"));
+        
+        VILLAGER_SELLS.put(Items.IRON_SWORD, Set.of("weaponsmith"));
+        VILLAGER_SELLS.put(Items.IRON_AXE, Set.of("weaponsmith"));
+        VILLAGER_SELLS.put(Items.DIAMOND_SWORD, Set.of("weaponsmith"));
+        VILLAGER_SELLS.put(Items.DIAMOND_AXE, Set.of("weaponsmith"));
+        
+        VILLAGER_SELLS.put(Items.IRON_PICKAXE, Set.of("toolsmith"));
+        VILLAGER_SELLS.put(Items.IRON_SHOVEL, Set.of("toolsmith"));
+        VILLAGER_SELLS.put(Items.IRON_HOE, Set.of("toolsmith"));
+        VILLAGER_SELLS.put(Items.DIAMOND_PICKAXE, Set.of("toolsmith"));
+        
+        VILLAGER_SELLS.put(Items.LEATHER_HELMET, Set.of("leatherworker"));
+        VILLAGER_SELLS.put(Items.LEATHER_CHESTPLATE, Set.of("leatherworker"));
+        VILLAGER_SELLS.put(Items.LEATHER_LEGGINGS, Set.of("leatherworker"));
+        VILLAGER_SELLS.put(Items.LEATHER_BOOTS, Set.of("leatherworker"));
+        VILLAGER_SELLS.put(Items.SADDLE, Set.of("leatherworker"));
+        
+        VILLAGER_SELLS.put(Items.ENDER_PEARL, Set.of("cleric"));
+        VILLAGER_SELLS.put(Items.GLOWSTONE, Set.of("cleric"));
+        VILLAGER_SELLS.put(Items.EXPERIENCE_BOTTLE, Set.of("cleric"));
+        
+        VILLAGER_SELLS.put(Items.COOKED_MUTTON, Set.of("butcher"));
+        VILLAGER_SELLS.put(Items.COOKED_PORKCHOP, Set.of("butcher"));
+        VILLAGER_SELLS.put(Items.COOKED_CHICKEN, Set.of("butcher"));
+        VILLAGER_SELLS.put(Items.COOKED_BEEF, Set.of("butcher"));
+        
+        VILLAGER_SELLS.put(Items.BRICK, Set.of("mason"));
+        VILLAGER_SELLS.put(Items.QUARTZ, Set.of("mason"));
+        VILLAGER_SELLS.put(Items.DRIPSTONE_BLOCK, Set.of("mason"));
+    }
 
     private final Setting<Boolean> Debug = sgGeneral.add(new BoolSetting.Builder()
             .name("Debug")
@@ -162,40 +265,39 @@ public class TradeAura extends Module {
         };
     }
 
-	private void addRuleRow(GuiTheme theme, WTable table, TradeRule rule, boolean isSell, WVerticalList rootList) {
-		Setting<List<Item>> itemSetting = new ItemListSetting.Builder()
-			.name("items")
-			.description("Items for this rule")
-			.defaultValue(new ArrayList<>(rule.items))
-			.onChanged(items -> {
-				rule.items.clear();
-				rule.items.addAll(items);
-			})
-			.build();
+    private void addRuleRow(GuiTheme theme, WTable table, TradeRule rule, boolean isSell, WVerticalList rootList) {
+        Setting<List<Item>> itemSetting = new ItemListSetting.Builder()
+            .name("items")
+            .description("Items for this rule")
+            .defaultValue(new ArrayList<>(rule.items))
+            .onChanged(items -> {
+                rule.items.clear();
+                rule.items.addAll(items);
+            })
+            .build();
 
-		// Create settings with a new group that has an empty name
-		Settings dummySettings = new Settings();
-		SettingGroup hiddenGroup = dummySettings.createGroup("");
-		hiddenGroup.sectionExpanded = (true);
-		hiddenGroup.add(itemSetting);
-		
-		table.add(theme.settings(dummySettings)).expandX().top();
+        Settings dummySettings = new Settings();
+        SettingGroup hiddenGroup = dummySettings.createGroup("");
+        hiddenGroup.sectionExpanded = (true);
+        hiddenGroup.add(itemSetting);
+        
+        table.add(theme.settings(dummySettings)).expandX().top();
 
-		WIntEdit val1Edit = table.add(theme.intEdit(rule.value1, -1, 10000, false)).minWidth(70).top().widget();
-		val1Edit.action = () -> rule.value1 = val1Edit.get();
+        WIntEdit val1Edit = table.add(theme.intEdit(rule.value1, -1, 10000, false)).minWidth(70).top().widget();
+        val1Edit.action = () -> rule.value1 = val1Edit.get();
 
-		WIntEdit val2Edit = table.add(theme.intEdit(rule.value2, -1, 10000, false)).minWidth(70).top().widget();
-		val2Edit.action = () -> rule.value2 = val2Edit.get();
+        WIntEdit val2Edit = table.add(theme.intEdit(rule.value2, -1, 10000, false)).minWidth(70).top().widget();
+        val2Edit.action = () -> rule.value2 = val2Edit.get();
 
-		WMinus removeBtn = table.add(theme.minus()).top().widget();
-		removeBtn.action = () -> {
-			if (isSell) sellRules.remove(rule);
-			else buyRules.remove(rule);
-			rebuildGui(theme, rootList);
-		};
+        WMinus removeBtn = table.add(theme.minus()).top().widget();
+        removeBtn.action = () -> {
+            if (isSell) sellRules.remove(rule);
+            else buyRules.remove(rule);
+            rebuildGui(theme, rootList);
+        };
 
-		table.row();
-	}
+        table.row();
+    }
 
     @Override
     public NbtCompound toTag() {
@@ -626,6 +728,84 @@ public class TradeAura extends Module {
         }
     }
 
+    // НОВЫЙ МЕТОД: Предварительная проверка, стоит ли кликать жителя
+    private boolean shouldSkipVillager(Entity target) {
+        if (!(target instanceof VillagerEntity villager)) return false;
+
+        String professionName = "none";
+        try {
+            Object villagerData = villager.getVillagerData();
+            Object professionObj = null;
+            
+            // 1. Получаем объект профессии (в новых версиях это обертка, в старых - сам VillagerProfession)
+            for (java.lang.reflect.Method m : villagerData.getClass().getMethods()) {
+                if ((m.getName().equals("profession") || m.getName().equals("getProfession")) && m.getParameterCount() == 0) {
+                    professionObj = m.invoke(villagerData);
+                    break;
+                }
+            }
+            
+            if (professionObj != null) {
+                // 2. Если это обертка (например RegistryEntry), пытаемся вызвать метод value()
+                if (!(professionObj instanceof VillagerProfession)) {
+                    for (java.lang.reflect.Method m : professionObj.getClass().getMethods()) {
+                        if (m.getName().equals("value") && m.getParameterCount() == 0) {
+                            Object unwrapped = m.invoke(professionObj);
+                            if (unwrapped instanceof VillagerProfession) {
+                                professionObj = unwrapped;
+                                break;
+                            }
+                        }
+                    }
+                }
+                
+                // 3. Если в итоге получили VillagerProfession, достаем его ID
+                if (professionObj instanceof VillagerProfession prof) {
+                    Identifier id = Registries.VILLAGER_PROFESSION.getId(prof);
+                    if (id != null) {
+                        professionName = id.getPath();
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // Если что-то пошло не так (рефлексия неудалась), не блокируем клик
+            return false; 
+        }
+
+        // 1. Проверяем правила ПРОДАЖИ (мы продаем жителю)
+        for (TradeRule rule : sellRules) {
+            boolean sellLimitOk = rule.value2 == -1 || countItemInInventory(Items.EMERALD) < rule.value2;
+            
+            for (Item item : rule.items) {
+                if (!VILLAGER_BUYS.containsKey(item)) {
+                    return false;
+                }
+                boolean correctProfession = VILLAGER_BUYS.get(item).contains(professionName);
+                
+                if (correctProfession && sellLimitOk) {
+                    return false;
+                }
+            }
+        }
+
+        // 2. Проверяем правила ПОКУПКИ (мы покупаем у жителя)
+        for (TradeRule rule : buyRules) {
+            for (Item item : rule.items) {
+                if (!VILLAGER_SELLS.containsKey(item)) {
+                    return false;
+                }
+                boolean correctProfession = VILLAGER_SELLS.get(item).contains(professionName);
+                boolean buyLimitOk = rule.value2 == -1 || countItemInInventory(item) < rule.value2;
+                
+                if (correctProfession && buyLimitOk) {
+                    return false;
+                }
+            }
+        }
+
+        return true; 
+    }
+
     @EventHandler
     private void onTick(TickEvent.Pre event) {
         if (!mc.player.isAlive() || PlayerUtils.getGameMode() == GameMode.SPECTATOR) return;
@@ -651,6 +831,12 @@ public class TradeAura extends Module {
 
         for (Entity targett : targets) {
             if (!VillagerCooldown.containsKey(targett)) {
+                if (shouldSkipVillager(targett)) {
+                    if (Debug.get()) info("Skipped villager (pre-check: no valid trades possible).");
+                    VillagerCooldown.put(targett, new Pair<>(0, limitReachedColor.get()));
+                    continue;
+                }
+
                 remember_entity = targett;
                 VillagerCooldown.put(targett, new Pair<>(0, defaultColor.get()));
                 VillagerInteract(targett);
