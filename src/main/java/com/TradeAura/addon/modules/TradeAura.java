@@ -163,36 +163,39 @@ public class TradeAura extends Module {
     }
 
 	private void addRuleRow(GuiTheme theme, WTable table, TradeRule rule, boolean isSell, WVerticalList rootList) {
-        Setting<List<Item>> itemSetting = new ItemListSetting.Builder()
-            .name("items")
-            .description("Items for this rule")
-            .defaultValue(new ArrayList<>(rule.items))
-            .onChanged(items -> {
-                rule.items.clear();
-                rule.items.addAll(items);
-            })
-            .build();
+		Setting<List<Item>> itemSetting = new ItemListSetting.Builder()
+			.name("items")
+			.description("Items for this rule")
+			.defaultValue(new ArrayList<>(rule.items))
+			.onChanged(items -> {
+				rule.items.clear();
+				rule.items.addAll(items);
+			})
+			.build();
 
-        // ИСПРАВЛЕНО: Оборачиваем настройку в виртуальный контейнер Settings
-        Settings dummySettings = new Settings();
-        dummySettings.getDefaultGroup().add(itemSetting);
-        table.add(theme.settings(dummySettings)).expandX().top();
+		// Create settings with a new group that has an empty name
+		Settings dummySettings = new Settings();
+		SettingGroup hiddenGroup = dummySettings.createGroup("");
+		hiddenGroup.sectionExpanded = (true);
+		hiddenGroup.add(itemSetting);
+		
+		table.add(theme.settings(dummySettings)).expandX().top();
 
-        WIntEdit val1Edit = table.add(theme.intEdit(rule.value1, -1, 10000, false)).minWidth(70).top().widget();
-        val1Edit.action = () -> rule.value1 = val1Edit.get();
+		WIntEdit val1Edit = table.add(theme.intEdit(rule.value1, -1, 10000, false)).minWidth(70).top().widget();
+		val1Edit.action = () -> rule.value1 = val1Edit.get();
 
-        WIntEdit val2Edit = table.add(theme.intEdit(rule.value2, -1, 10000, false)).minWidth(70).top().widget();
-        val2Edit.action = () -> rule.value2 = val2Edit.get();
+		WIntEdit val2Edit = table.add(theme.intEdit(rule.value2, -1, 10000, false)).minWidth(70).top().widget();
+		val2Edit.action = () -> rule.value2 = val2Edit.get();
 
-        WMinus removeBtn = table.add(theme.minus()).top().widget();
-        removeBtn.action = () -> {
-            if (isSell) sellRules.remove(rule);
-            else buyRules.remove(rule);
-            rebuildGui(theme, rootList);
-        };
+		WMinus removeBtn = table.add(theme.minus()).top().widget();
+		removeBtn.action = () -> {
+			if (isSell) sellRules.remove(rule);
+			else buyRules.remove(rule);
+			rebuildGui(theme, rootList);
+		};
 
-        table.row();
-    }
+		table.row();
+	}
 
     @Override
     public NbtCompound toTag() {
