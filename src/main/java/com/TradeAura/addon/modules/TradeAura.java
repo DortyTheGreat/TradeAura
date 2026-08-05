@@ -1,141 +1,59 @@
 package com.TradeAura.addon.modules;
 
-import meteordevelopment.meteorclient.systems.modules.Category;
-import meteordevelopment.meteorclient.settings.*;
-import meteordevelopment.meteorclient.systems.modules.Module;
-/// ^^^ MODULE BASIC IMPORTS ^^^
-
-
-import net.minecraft.network.packet.c2s.play.*;
 import meteordevelopment.meteorclient.events.game.OpenScreenEvent;
 import meteordevelopment.meteorclient.events.packets.PacketEvent;
-
-import meteordevelopment.meteorclient.systems.modules.Categories;
+import meteordevelopment.meteorclient.events.render.Render3DEvent;
+import meteordevelopment.meteorclient.events.world.TickEvent;
 import meteordevelopment.orbit.EventHandler;
-
-import java.lang.reflect.Field;
-import meteordevelopment.meteorclient.MeteorClient;
-import net.minecraft.util.ActionResult;
-
+import meteordevelopment.meteorclient.renderer.ShapeMode;
+import meteordevelopment.meteorclient.settings.*;
+import meteordevelopment.meteorclient.systems.modules.Category;
+import meteordevelopment.meteorclient.systems.modules.Module;
+import meteordevelopment.meteorclient.utils.entity.SortPriority;
+import meteordevelopment.meteorclient.utils.entity.TargetUtils;
 import meteordevelopment.meteorclient.utils.player.FindItemResult;
 import meteordevelopment.meteorclient.utils.player.InvUtils;
-
-import net.minecraft.client.MinecraftClient;
-
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-
-import net.minecraft.village.TradeOffer;
-import net.minecraft.village.TradeOfferList;
-
-import java.util.List;
-import net.minecraft.item.Item;
-import java.util.Arrays;
-
-import net.minecraft.client.gui.widget.TextFieldWidget;
-
-import net.minecraft.screen.MerchantScreenHandler;
-import net.minecraft.entity.passive.MerchantEntity;
-import org.apache.commons.lang3.reflect.FieldUtils;
-import net.minecraft.client.gui.screen.ingame.MerchantScreen;
-import net.minecraft.village.*;
-import net.minecraft.village.MerchantInventory;
-import java.lang.reflect.Method;
-import java.lang.reflect.InvocationTargetException;
-
-import meteordevelopment.meteorclient.utils.player.SlotUtils;
-import net.minecraft.screen.ScreenHandler;
-
-import net.minecraft.network.packet.c2s.play.SelectMerchantTradeC2SPacket;
-import net.minecraft.entity.Entity;
-
-import java.util.ArrayList;
-import meteordevelopment.meteorclient.events.world.TickEvent;
-import meteordevelopment.meteorclient.utils.entity.SortPriority;
-
-import net.minecraft.world.GameMode;
 import meteordevelopment.meteorclient.utils.player.PlayerUtils;
-import net.minecraft.entity.passive.VillagerEntity;
-import meteordevelopment.meteorclient.utils.entity.TargetUtils;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.math.Box;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.util.Hand;
-import java.util.HashMap;
-import java.util.Map;
-import net.minecraft.util.math.Vec3d;
 import meteordevelopment.meteorclient.utils.player.Rotations;
-
 import meteordevelopment.meteorclient.utils.render.color.Color;
 import meteordevelopment.meteorclient.utils.render.color.SettingColor;
-import meteordevelopment.meteorclient.events.render.Render3DEvent;
-
-import net.minecraft.util.Pair;
-import meteordevelopment.meteorclient.renderer.ShapeMode;
-
-// todo: delete useless imports
-import it.unimi.dsi.fastutil.objects.ObjectIntImmutablePair;
-import meteordevelopment.meteorclient.events.entity.player.InteractEntityEvent;
-import meteordevelopment.meteorclient.events.entity.player.StartBreakingBlockEvent;
-import meteordevelopment.meteorclient.gui.GuiTheme;
-import meteordevelopment.meteorclient.gui.widgets.WWidget;
-import meteordevelopment.meteorclient.gui.widgets.containers.WHorizontalList;
-import meteordevelopment.meteorclient.gui.widgets.containers.WSection;
-import meteordevelopment.meteorclient.gui.widgets.containers.WTable;
-import meteordevelopment.meteorclient.gui.widgets.containers.WVerticalList;
-import meteordevelopment.meteorclient.gui.widgets.input.WDropdown;
-import meteordevelopment.meteorclient.gui.widgets.input.WIntEdit;
-import meteordevelopment.meteorclient.gui.widgets.input.WTextBox;
-import meteordevelopment.meteorclient.gui.widgets.pressable.WButton;
-import meteordevelopment.meteorclient.gui.widgets.pressable.WCheckbox;
-import meteordevelopment.meteorclient.gui.widgets.pressable.WMinus;
-import meteordevelopment.meteorclient.pathing.BaritoneUtils;
-import meteordevelopment.meteorclient.utils.misc.ISerializable;
-import meteordevelopment.meteorclient.utils.misc.Names;
-import meteordevelopment.orbit.EventPriority;
-import net.minecraft.block.Block;
-import net.minecraft.block.Blocks;
-import net.minecraft.client.sound.PositionedSoundInstance;
-import net.minecraft.component.DataComponentTypes;
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.enchantment.EnchantmentHelper;
-import net.minecraft.enchantment.EnchantmentLevelEntry;
+import net.minecraft.client.gui.screen.ingame.MerchantScreen;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.LivingEntity;
+import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.entity.projectile.ProjectileUtil;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.nbt.NbtElement;
-import net.minecraft.nbt.NbtIo;
-import net.minecraft.nbt.NbtList;
-import net.minecraft.network.packet.s2c.common.DisconnectS2CPacket;
+import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
+import net.minecraft.item.Items;
+import net.minecraft.network.packet.c2s.play.SelectMerchantTradeC2SPacket;
 import net.minecraft.network.packet.s2c.play.SetTradeOffersS2CPacket;
 import net.minecraft.registry.Registries;
-import net.minecraft.registry.Registry;
-import net.minecraft.registry.RegistryKeys;
-import net.minecraft.registry.entry.RegistryEntry;
-import net.minecraft.registry.tag.EnchantmentTags;
-import net.minecraft.sound.SoundEvent;
-import net.minecraft.sound.SoundEvents;
-import net.minecraft.text.MutableText;
-import net.minecraft.text.Text;
+import net.minecraft.screen.MerchantScreenHandler;
+import net.minecraft.util.ActionResult;
+import net.minecraft.util.Hand;
 import net.minecraft.util.Identifier;
+import net.minecraft.util.Pair;
 import net.minecraft.util.hit.EntityHitResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.village.VillagerProfession;
-import org.apache.commons.io.FilenameUtils;
+import net.minecraft.util.math.Box;
+import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.village.Merchant;
+import net.minecraft.village.TradeOffer;
+import net.minecraft.village.TradeOfferList;
+import net.minecraft.world.GameMode;
+import org.apache.commons.lang3.reflect.FieldUtils;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.DirectoryStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.*;
-
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class TradeAura extends Module {
 
     private final SettingGroup sgGeneral = settings.getDefaultGroup();
     private final SettingGroup sgAura = settings.createGroup("Aura");
     private final SettingGroup sgRender = settings.createGroup("Render");
-
 
     private final Setting<Boolean> Debug = sgGeneral.add(new BoolSetting.Builder()
             .name("Debug")
@@ -169,38 +87,36 @@ public class TradeAura extends Module {
     );
 
     /*
-     * НОВОЕ: конфигурация по каждому предмету вместо глобальных MaxPrice / MaxSellPrice / items.
-     * Формат одной строки: item_id;maxBuyPrice;maxBarterPrice;buyLimit;minSellPrice;maxSellQuantity
+     * NEW: per-item configuration instead of global MaxPrice / MaxSellPrice / items.
+     * Format of one string: item_id;maxBuyPrice;maxBarterPrice;buyLimit;minSellPrice;maxSellQuantity
      *
-     *   item_id        - id предмета (например minecraft:diamond)
+     *   item_id        - item id (e.g. minecraft:diamond)
      *
-     *   -- покупка (вы получаете item_id, платите изумрудами или бартером) --
-     *   maxBuyPrice    - максимальная цена в ИЗУМРУДАХ, которую вы готовы заплатить за item_id
-     *   maxBarterPrice - максимальное количество НЕ-изумрудных предметов, которое вы готовы отдать
-     *                    за item_id (редкий случай бартерных трейдов)
-     *   buyLimit       - максимальное количество item_id в инвентаре, после которого покупка
-     *                    прекращается. -1 = без лимита.
+     *   -- buying (you receive item_id, pay with emeralds or barter) --
+     *   maxBuyPrice    - maximum price in EMERALDS you are willing to pay for item_id
+     *   maxBarterPrice - maximum amount of NON-emerald items you are willing to give
+     *                    for item_id (rare barter trade case)
+     *   buyLimit       - maximum amount of item_id in inventory before buying stops. -1 = no limit.
      *
-     *   -- продажа (вы отдаёте item_id жителю, получаете изумруды) --
-     *   minSellPrice   - минимальное количество изумрудов, за которое вы готовы продать item_id.
-     *                    -1 = никогда не продавать этот предмет.
-     *   maxSellQuantity - максимальное количество item_id, которое вы готовы отдать за 1 трейд
-     *                    (у жителей меняется именно ЭТО число, а не число изумрудов — они почти
-     *                    всегда дают 1 изумруд, но могут просить и 8, и 36 предметов за него).
-     *                    -1 = без ограничения по количеству.
+     *   -- selling (you give item_id to the villager, get emeralds) --
+     *   minSellPrice   - minimum amount of emeralds for which you are willing to sell item_id.
+     *                    -1 = never sell this item.
+     *   maxSellQuantity - maximum amount of item_id you are willing to give per 1 trade
+     *                    (villagers change THIS number, not the number of emeralds — they almost
+     *                    always give 1 emerald, but can ask for 8 or 36 items for it).
+     *                    -1 = no limit on the quantity.
      *
-     * Пример: minecraft:diamond;40;64;-1;-1;-1        (покупаем алмазы, не продаём)
-     *         minecraft:rotten_flesh;0;0;-1;1;16       (продаём гнилую плоть от 1 изумруда,
-     *                                                    но не больше 16 штук за трейд)
+     * Example: minecraft:diamond;40;64;-1;-1;-1        (buy diamonds, don't sell)
+     *          minecraft:rotten_flesh;0;0;-1;1;16       (sell rotten flesh for 1 emerald,
+     *                                                    but no more than 16 items per trade)
      */
     private final Setting<List<String>> itemConfigs = sgGeneral.add(new StringListSetting.Builder()
             .name("item-configs")
-            .description("Формат: item_id;maxBuyPrice;maxBarterPrice;buyLimit;minSellPrice;maxSellQuantity (-1 = без лимита / не продавать). Пример: minecraft:diamond;40;64;-1;-1;-1")
+            .description("Format: item_id;maxBuyPrice;maxBarterPrice;buyLimit;minSellPrice;maxSellQuantity (-1 = no limit / do not sell). Example: minecraft:diamond;40;64;-1;-1;-1")
             .defaultValue(new ArrayList<>())
             .onChanged(list -> parseConfigs())
             .build()
     );
-
 
     private final Setting<Boolean> aura = sgAura.add(new BoolSetting.Builder()
             .name("Villager-Aura")
@@ -289,8 +205,8 @@ public class TradeAura extends Module {
             .visible(render::get)
             .build()
     );
-	
-	private final Setting<SettingColor> noSellItemsColor = sgRender.add(new ColorSetting.Builder()
+
+    private final Setting<SettingColor> noSellItemsColor = sgRender.add(new ColorSetting.Builder()
             .name("no-sell-item-color")
             .description("Color for no sellable items in inventory")
             .defaultValue(new SettingColor(255, 255, 255))
@@ -322,7 +238,7 @@ public class TradeAura extends Module {
             .build()
     );
 
-    // НОВОЕ: отдельный цвет для случая "лимит по количеству предмета в инвентаре достигнут"
+    // NEW: separate color for the "item inventory limit reached" case
     private final Setting<SettingColor> limitReachedColor = sgRender.add(new ColorSetting.Builder()
             .name("limit-reached-color")
             .description("Color for when the per-item inventory limit has been reached")
@@ -343,27 +259,25 @@ public class TradeAura extends Module {
         super(cat, "Trade-Aura", "Trades with villagers for you");
     }
 
-
-    /// Pair<Integer, String> pair = new Pair<>(1, "One");
     private final List<Entity> targets = new ArrayList<>();
     private final Map<Entity, Pair<Integer, Color>> VillagerCooldown = new HashMap<>();
 
     private int ticker = 0;
     private int ticker_close = 0;
-    // НОВОЕ: становится true только после того, как syncing_func реально обработал трейды
-    // для текущего окна. Закрытие окна (см. onTick) ждёт этого флага вместо сырого счётчика
-    // от момента открытия экрана.
+    // NEW: becomes true only after syncing_func has actually processed the trades
+    // for the current window. Window closing (see onTick) waits for this flag instead of a raw counter
+    // from the moment the screen was opened.
     private boolean pendingClose = false;
 
-    // НОВОЕ: распарсенный конфиг по предметам, item -> настройки
+    // NEW: parsed item config, item -> settings
     private final Map<Item, ItemConfig> parsedConfigs = new HashMap<>();
 
     private static class ItemConfig {
         final int maxBuyPrice;
         final int maxBarterPrice;
-        final int buyLimit;        // -1 = без лимита
-        final int minSellPrice;    // -1 = не продавать этот предмет
-        final int maxSellQuantity; // -1 = без ограничения по количеству отдаваемых предметов
+        final int buyLimit;        // -1 = no limit
+        final int minSellPrice;    // -1 = do not sell this item
+        final int maxSellQuantity; // -1 = no limit on the quantity of given items
 
         ItemConfig(int maxBuyPrice, int maxBarterPrice, int buyLimit, int minSellPrice, int maxSellQuantity) {
             this.maxBuyPrice = maxBuyPrice;
@@ -374,9 +288,9 @@ public class TradeAura extends Module {
         }
     }
 
-    // Парсит настройку item-configs в удобную мапу Item -> ItemConfig.
-    // Ошибки парсинга ВСЕГДА выводятся в чат (не только при Debug), так как без этого
-    // тихо сломанный конфиг выглядит как "модуль не работает".
+    // Parses the item-configs setting into a convenient Item -> ItemConfig map.
+    // Parsing errors are ALWAYS printed to chat (not just in Debug), because without this
+    // a silently broken config looks like "the module doesn't work".
     private void parseConfigs() {
         parsedConfigs.clear();
 
@@ -387,7 +301,7 @@ public class TradeAura extends Module {
 
             String[] parts = line.split(";");
             if (parts.length != 6) {
-                info("[TradeAura] Неверная строка item-config (нужно 6 полей через ';': item_id;maxBuyPrice;maxBarterPrice;buyLimit;minSellPrice;maxSellQuantity): '" + line + "'");
+                info("[TradeAura] Invalid item-config string (requires 6 fields separated by ';': item_id;maxBuyPrice;maxBarterPrice;buyLimit;minSellPrice;maxSellQuantity): '" + line + "'");
                 continue;
             }
 
@@ -395,12 +309,12 @@ public class TradeAura extends Module {
                 String idStr = parts[0].trim();
                 Identifier id = Identifier.tryParse(idStr);
                 if (id == null) {
-                    info("[TradeAura] Не удалось распознать item id: '" + idStr + "'");
+                    info("[TradeAura] Failed to parse item id: '" + idStr + "'");
                     continue;
                 }
 
                 if (!Registries.ITEM.containsId(id)) {
-                    info("[TradeAura] Неизвестный предмет: '" + idStr + "'");
+                    info("[TradeAura] Unknown item: '" + idStr + "'");
                     continue;
                 }
 
@@ -414,14 +328,15 @@ public class TradeAura extends Module {
 
                 parsedConfigs.put(item, new ItemConfig(maxBuy, maxBarter, limit, minSell, maxSellQty));
             } catch (NumberFormatException e) {
-                info("[TradeAura] Не число в строке item-config: '" + line + "'");
+                info("[TradeAura] Not a number in item-config string: '" + line + "'");
             }
         }
 
-        if (Debug.get()) info("[TradeAura] Загружено конфигов предметов: " + parsedConfigs.size());
+        if (Debug.get()) info("[TradeAura] Loaded item configs: " + parsedConfigs.size());
     }
 
-    // НОВОЕ: считает суммарное количество предмета в инвентаре игрока (хотбар + основной инвентарь)
+    // NEW: counts the total amount of an item in the player's inventory (hotbar + main inventory)
+    // Uses Meteor's InvUtils to avoid accessing private Minecraft fields (fixes IllegalAccessError)
     private int countItemInInventory(Item item) {
         FindItemResult result = InvUtils.find(item);
         return result.count();
@@ -437,13 +352,10 @@ public class TradeAura extends Module {
         parseConfigs();
     }
 
-    private MerchantScreenHandler MSH_g;
-
     @EventHandler
     private void onOpenScreen(OpenScreenEvent event) {
         if (!(event.screen instanceof MerchantScreen)) return;
 
-		//info("open screen");
         if (CancelEvent.get()) event.cancel();
     }
 
@@ -452,16 +364,13 @@ public class TradeAura extends Module {
     private void onPacketReceive(PacketEvent.Receive event) {
         if (!(event.packet instanceof SetTradeOffersS2CPacket)) return;
 
-        //if (Debug.get()) info("packet1");
         mc.execute(() -> {
             if (mc.player == null) return;
             if (!(mc.player.currentScreenHandler instanceof MerchantScreenHandler MSH)) return;
 
-            //if (Debug.get()) info("packet2");
             syncing_func(MSH);
         });
     }
-
 
     private Entity remember_entity;
 
@@ -475,11 +384,11 @@ public class TradeAura extends Module {
 
     private void syncing_func(MerchantScreenHandler MSH) {
         if (parsedConfigs.isEmpty()) {
-            info("[TradeAura] item-configs пуст — нечего покупать/продавать. Добавь строки вида 'minecraft:diamond;40;64;-1;-1;-1' в настройке item-configs.");
+            info("[TradeAura] item-configs is empty — nothing to buy/sell. Add lines like 'minecraft:diamond;40;64;-1;-1;-1' to the item-configs setting.");
         }
 
         try {
-            /// АХТУНГ! https://maven.fabricmc.net/docs/yarn-23w51b+build.4/net/minecraft/screen/MerchantScreenHandler.html#merchant
+            /// WARNING! https://maven.fabricmc.net/docs/yarn-23w51b+build.4/net/minecraft/screen/MerchantScreenHandler.html#merchant
             if (!(FieldUtils.readField(MSH, "field_7863", true) instanceof Merchant merc)) return;
             FindItemResult resultEm = InvUtils.find(Items.EMERALD);
             if (!resultEm.found()) {
@@ -501,19 +410,19 @@ public class TradeAura extends Module {
             for (TradeOffer offer : Offers) {
                 num++;
 
-                ItemStack sellItem = offer.getSellItem();          // то, что вы ПОЛУЧАЕТЕ от трейда
-                ItemStack payItem = offer.getDisplayedFirstBuyItem(); // то, что вы ОТДАЁТЕ за трейд
+                ItemStack sellItem = offer.getSellItem();          // what you RECEIVE from the trade
+                ItemStack payItem = offer.getDisplayedFirstBuyItem(); // what you PAY for the trade
 
-                // НОВОЕ: villager "sell"-трейды (вы отдаёте предмет, получаете изумруды) выглядят так,
-                // что sellItem - это изумруд, а payItem - реальный отдаваемый предмет. Раньше конфиг
-                // всегда искался по sellItem.getItem(), из-за чего продажа была в принципе невозможна
-                // (изумруд не мог совпасть ни с одним ключом конфига).
+                // NEW: villager "sell"-trades (you give an item, get emeralds) look like this:
+                // sellItem is an emerald, and payItem is the actual given item. Previously the config
+                // was always searched by sellItem.getItem(), which made selling impossible in principle
+                // (emerald could not match any config key).
                 boolean isSellingToVillager = sellItem.isOf(Items.EMERALD) && !payItem.isOf(Items.EMERALD);
 
                 if (isSellingToVillager) {
                     
                     ItemConfig sellConfig = parsedConfigs.get(payItem.getItem());
-                    if (sellConfig == null || sellConfig.minSellPrice < 0) continue; // продажа этого предмета не настроена/отключена
+                    if (sellConfig == null || sellConfig.minSellPrice < 0) continue; // selling this item is not configured/disabled
 
                     if (sellItem.getCount() < sellConfig.minSellPrice) {
                         if (Debug.get())
@@ -522,9 +431,9 @@ public class TradeAura extends Module {
                         continue;
                     }
 
-                    // НОВОЕ: контролируем именно количество ОТДАВАЕМОГО предмета за трейд —
-                    // у жителей эмеральдов почти всегда 1, а вот сколько предметов они просят
-                    // за него, как раз и меняется (может быть и 8, и 36).
+                    // NEW: we control exactly the quantity of the GIVEN item per trade —
+                    // villagers almost always give 1 emerald, but how many items they ask for it
+                    // is what changes (can be 8, or 36).
                     if (sellConfig.maxSellQuantity != -1 && payItem.getCount() > sellConfig.maxSellQuantity) {
                         if (Debug.get())
                             info(payItem.getName().getString() + " sell quantity too high: " + payItem.getCount() + " > " + sellConfig.maxSellQuantity);
@@ -532,11 +441,11 @@ public class TradeAura extends Module {
                         continue;
                     }
 
-                    // НОВОЕ: Проверяем, есть ли у игрока в инвентаре достаточно предметов для продажи
+                    // NEW: Check if the player has enough items in inventory to sell
                     int availableCount = countItemInInventory(payItem.getItem());
                     if (availableCount < payItem.getCount()) {
                         if (Debug.get())
-                            info("Недостаточно " + payItem.getName().getString() + " для продажи (есть " + availableCount + ", нужно " + payItem.getCount() + ")");
+                            info("Not enough " + payItem.getName().getString() + " to sell (have " + availableCount + ", need " + payItem.getCount() + ")");
                         updateColor(noSellItemsColor.get()); 
                         continue;
                     }
@@ -554,36 +463,36 @@ public class TradeAura extends Module {
                     continue;
                 }
 
-                // Обычная покупка: вы получаете sellItem, платите payItem (изумруды или бартер)
+                // Normal purchase: you get sellItem, pay payItem (emeralds or barter)
                 ItemConfig buyConfig = parsedConfigs.get(sellItem.getItem());
                 if (buyConfig != null) {
 
                     if (payItem.isOf(Items.EMERALD) && payItem.getCount() > buyConfig.maxBuyPrice) {
                         if (Debug.get())
-                            info(offer.getSellItem().toString() + " too expensive " + payItem.getCount());
+                            info(offer.getSellItem().getName().getString() + " too expensive " + payItem.getCount());
                         updateColor(TooExpensiveColor.get());
                         continue;
                     }
 
                     if (!payItem.isOf(Items.EMERALD) && payItem.getCount() > buyConfig.maxBarterPrice) {
-                        if (Debug.get()) info(payItem.toString() + " too high to barter " + payItem.getCount());
+                        if (Debug.get()) info(payItem.getName().getString() + " too high to barter " + payItem.getCount());
                         updateColor(TooExpensiveColor.get());
                         continue;
                     }
 
-                    // НОВОЕ: проверка лимита количества предмета в инвентаре перед покупкой
+                    // NEW: check item inventory limit before buying
                     if (buyConfig.buyLimit != -1) {
                         int currentCount = countItemInInventory(sellItem.getItem());
                         if (currentCount >= buyConfig.buyLimit) {
                             if (Debug.get())
-                                info(sellItem.getItem().toString() + " limit reached: " + currentCount + "/" + buyConfig.buyLimit);
+                                info(sellItem.getName().getString() + " limit reached: " + currentCount + "/" + buyConfig.buyLimit);
                             updateColor(limitReachedColor.get());
                             continue;
                         }
                     }
 
                     if (Debug.get()) {
-                        info("BUYING " + sellItem.getName());
+                        info("BUYING " + sellItem.getName().getString());
                     }
 
                     if (offer.isDisabled()) {
@@ -598,31 +507,27 @@ public class TradeAura extends Module {
                 }
                 /// https://maven.fabricmc.net/docs/yarn-20w51a+build.9/net/minecraft/village/TradeOffer.html#depleteBuyItems(net.minecraft.item.ItemStack,net.minecraft.item.ItemStack)
 
-
             }
 
-            /// Хороший вопрос на тему того, как стоит раставить приоритеты цветов...
+            /// A good question about how to arrange color priorities...
             if (tradeHappened) updateColor(yesPurchase.get());
 
-            // НОВОЕ: трейды обработаны — теперь можно начинать отсчёт до закрытия окна (см. onTick)
+            // NEW: trades processed — now we can start the countdown to close the window (see onTick)
             ticker_close = 0;
             pendingClose = true;
 
         } catch (IllegalAccessException e) {
             info("IAE ex");
-            // НОВОЕ: если рефлексия упала, окно иначе никогда не помечается на закрытие
-            // и виснет открытым до тех пор, пока игрок не отлетит и не вернётся.
+            // NEW: if reflection failed, the window would otherwise never be marked for closing
+            // and would hang open until the player flies away and returns.
             ticker_close = 0;
             pendingClose = true;
         }
-
     }
-
 
     private boolean entityCheck(Entity entity) {
         if (entity.equals(mc.player) || entity.equals(mc.getCameraEntity())) return false;
         if ((entity instanceof LivingEntity livingEntity && livingEntity.isDead()) || !entity.isAlive()) return false;
-
 
         Box hitbox = entity.getBoundingBox();
         if (!PlayerUtils.isWithin(
@@ -633,7 +538,6 @@ public class TradeAura extends Module {
         )) return false;
 
         return entity instanceof VillagerEntity;
-
     }
 
     public void lookAtVillager(Vec3d playerPos, Vec3d villagerPos) {
@@ -650,24 +554,24 @@ public class TradeAura extends Module {
 
     public void VillagerInteract(Entity villager) {
         
-		Vec3d playerPos = mc.player.getEyePos();
-		Vec3d villagerPos = villager.getEyePos();
-		EntityHitResult entityHitResult = ProjectileUtil.raycast(mc.player, playerPos, villagerPos, villager.getBoundingBox(), Entity::canHit, playerPos.squaredDistanceTo(villagerPos));
-		if (entityHitResult == null) {
-			// Raycast didn't find villager entity?
-			ActionResult actionResultDirect = mc.interactionManager.interactEntity(mc.player, villager, Hand.MAIN_HAND);
-			if (Debug.get()) info("Raycast didn't find a target");
-		} else {
-			
-			lookAtVillager(playerPos, villagerPos);
-			
+        Vec3d playerPos = mc.player.getEyePos();
+        Vec3d villagerPos = villager.getEyePos();
+        EntityHitResult entityHitResult = ProjectileUtil.raycast(mc.player, playerPos, villagerPos, villager.getBoundingBox(), Entity::canHit, playerPos.squaredDistanceTo(villagerPos));
+        if (entityHitResult == null) {
+            // Raycast didn't find villager entity?
+            ActionResult actionResultDirect = mc.interactionManager.interactEntity(mc.player, villager, Hand.MAIN_HAND);
+            if (Debug.get()) info("Raycast didn't find a target");
+        } else {
+            
+            lookAtVillager(playerPos, villagerPos);
+            
 
-			ActionResult actionResult = mc.interactionManager.interactEntityAtLocation(mc.player, villager, entityHitResult, Hand.MAIN_HAND);
-			if (!actionResult.isAccepted()) {
-				ActionResult actionResultDirect = mc.interactionManager.interactEntity(mc.player, villager, Hand.MAIN_HAND);
-				if (Debug.get()) info("Action wasn't accepted");
-			}
-		}
+            ActionResult actionResult = mc.interactionManager.interactEntityAtLocation(mc.player, villager, entityHitResult, Hand.MAIN_HAND);
+            if (!actionResult.isAccepted()) {
+                ActionResult actionResultDirect = mc.interactionManager.interactEntity(mc.player, villager, Hand.MAIN_HAND);
+                if (Debug.get()) info("Action wasn't accepted");
+            }
+        }
         
     }
 
@@ -679,10 +583,10 @@ public class TradeAura extends Module {
         ticker = 0;
 
         if (mc.player.currentScreenHandler instanceof MerchantScreenHandler) {
-            // НОВОЕ: закрытие окна теперь запускается не от момента открытия экрана,
-            // а от момента, когда syncing_func реально обработал трейды (см. pendingClose).
-            // Раньше окно могло закрыться ДО того, как придёт SetTradeOffersS2CPacket
-            // и успеет пройти покупка — отсюда "ничего не происходит" / перепутанные жители.
+            // NEW: window closing is now triggered not from the moment the screen opens,
+            // but from the moment syncing_func actually processed the trades (see pendingClose).
+            // Previously, the window could close BEFORE the SetTradeOffersS2CPacket arrived
+            // and the purchase had time to go through — hence "nothing happens" / mixed up villagers.
             if (!Close.get()) return;
             if (!pendingClose) return;
 
@@ -719,8 +623,6 @@ public class TradeAura extends Module {
                 VillagerCooldown.replace(e.getKey(), new Pair<>(time + 1, clr));
             }
         }
-
-
     }
 
     @EventHandler
@@ -731,10 +633,7 @@ public class TradeAura extends Module {
             Entity entity = e.getKey();
             drawBoundingBox(event, entity, e.getValue().getRight());
         }
-
-
     }
-
 
     private void drawBoundingBox(Render3DEvent event, Entity entity, Color color) {
 
@@ -753,6 +652,4 @@ public class TradeAura extends Module {
         event.renderer.box(x + box.minX, y + box.minY, z + box.minZ, x + box.maxX, y + box.maxY, z + box.maxZ, sideColor, lineColor, ShapeMode.Both, 0);
 
     }
-
-
 }
