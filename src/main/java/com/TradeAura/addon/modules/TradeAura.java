@@ -5,15 +5,12 @@ import meteordevelopment.meteorclient.events.packets.PacketEvent;
 import meteordevelopment.meteorclient.events.render.Render3DEvent;
 import meteordevelopment.meteorclient.events.world.TickEvent;
 import meteordevelopment.meteorclient.gui.GuiTheme;
-import meteordevelopment.meteorclient.gui.widgets.WItemWithLabel;
 import meteordevelopment.meteorclient.gui.widgets.WWidget;
 import meteordevelopment.meteorclient.gui.widgets.containers.WSection;
 import meteordevelopment.meteorclient.gui.widgets.containers.WTable;
 import meteordevelopment.meteorclient.gui.widgets.containers.WVerticalList;
 import meteordevelopment.meteorclient.gui.widgets.input.WIntEdit;
-import meteordevelopment.meteorclient.gui.widgets.input.WTextBox;
 import meteordevelopment.meteorclient.gui.widgets.pressable.WMinus;
-import meteordevelopment.meteorclient.gui.widgets.pressable.WPlus;
 import meteordevelopment.meteorclient.settings.*;
 import meteordevelopment.meteorclient.systems.modules.Category;
 import meteordevelopment.meteorclient.systems.modules.Module;
@@ -165,50 +162,29 @@ public class TradeAura extends Module {
         };
     }
 
-    private void addRuleRow(GuiTheme theme, WTable table, TradeRule rule, boolean isSell, WVerticalList rootList) {
-        WTable itemsTable = table.add(theme.table()).expandX().widget();
+	private void addRuleRow(GuiTheme theme, WTable table, TradeRule rule, boolean isSell, WVerticalList rootList) {
+        Setting<List<Item>> itemSetting = new ItemListSetting.Builder()
+            .name("items")
+            .description("Items for this rule")
+            .defaultValue(new ArrayList<>(rule.items))
+            .onChanged(items -> {
+                rule.items.clear();
+                rule.items.addAll(items);
+            })
+            .build();
 
-        for (Item item : rule.items) {
-            itemsTable.add(theme.itemWithLabel(new ItemStack(item))).widget();
-            itemsTable.add(theme.minus()).widget().action = () -> {
-                rule.items.remove(item);
-                rebuildGui(theme, rootList);
-            };
-            itemsTable.row();
-        }
+        // ИСПРАВЛЕНО: Оборачиваем настройку в виртуальный контейнер Settings
+        Settings dummySettings = new Settings();
+        dummySettings.getDefaultGroup().add(itemSetting);
+        table.add(theme.settings(dummySettings)).expandX().top();
 
-        WTextBox newItemBox = itemsTable.add(theme.textBox("")).expandX().widget();
-        newItemBox.tooltip = "Enter item ID or name (e.g. minecraft:diamond or diamond)";
-        WPlus addBtn = itemsTable.add(theme.plus()).widget();
-        addBtn.action = () -> {
-            String trimmed = newItemBox.get().trim();
-            if (!trimmed.isEmpty()) {
-                Identifier id = Identifier.tryParse(trimmed);
-                Item item = null;
-                if (id != null && Registries.ITEM.containsId(id)) {
-                    item = Registries.ITEM.get(id);
-                } else {
-                    for (Item regItem : Registries.ITEM) {
-                        if (regItem.getName().getString().equalsIgnoreCase(trimmed)) {
-                            item = regItem;
-                            break;
-                        }
-                    }
-                }
-                if (item != null && !rule.items.contains(item)) {
-                    rule.items.add(item);
-                    rebuildGui(theme, rootList);
-                }
-            }
-        };
-
-        WIntEdit val1Edit = table.add(theme.intEdit(rule.value1, -1, 10000, false)).minWidth(70).widget();
+        WIntEdit val1Edit = table.add(theme.intEdit(rule.value1, -1, 10000, false)).minWidth(70).top().widget();
         val1Edit.action = () -> rule.value1 = val1Edit.get();
 
-        WIntEdit val2Edit = table.add(theme.intEdit(rule.value2, -1, 10000, false)).minWidth(70).widget();
+        WIntEdit val2Edit = table.add(theme.intEdit(rule.value2, -1, 10000, false)).minWidth(70).top().widget();
         val2Edit.action = () -> rule.value2 = val2Edit.get();
 
-        WMinus removeBtn = table.add(theme.minus()).widget();
+        WMinus removeBtn = table.add(theme.minus()).top().widget();
         removeBtn.action = () -> {
             if (isSell) sellRules.remove(rule);
             else buyRules.remove(rule);
@@ -226,7 +202,6 @@ public class TradeAura extends Module {
         return tag;
     }
 
-    // БЕЗОПАСНОЕ ЧТЕНИЕ NBT (исправляет краш на новых версиях)
     @Override
     public Module fromTag(NbtCompound tag) {
         super.fromTag(tag);
@@ -260,31 +235,29 @@ public class TradeAura extends Module {
         return list;
     }
 
-	private void rulesFromTag(NbtList list, List<TradeRule> rules) {
-		for (NbtElement element : list) {
-			if (element instanceof NbtCompound ruleTag) {
-				TradeRule rule = new TradeRule();
-				
-				if (ruleTag.get("items") instanceof NbtList itemsList) {
-					for (NbtElement itemElement : itemsList) {
-						if (itemElement instanceof NbtString itemString) {
-							// ИСПРАВЛЕНО: asString() теперь возвращает Optional<String>
-							itemString.asString().ifPresent(idStr -> {
-								Identifier id = Identifier.tryParse(idStr);
-								if (id != null && Registries.ITEM.containsId(id)) {
-									rule.items.add(Registries.ITEM.get(id));
-								}
-							});
-						}
-					}
-				}
-				
-				// ИСПРАВЛЕНО: getInt() теперь возвращает Optional<Integer>
-				rule.value1 = ruleTag.getInt("value1").orElse(-1);
-				rule.value2 = ruleTag.getInt("value2").orElse(-1);
-				rules.add(rule);
-			}
-		}
+    private void rulesFromTag(NbtList list, List<TradeRule> rules) {
+        for (NbtElement element : list) {
+            if (element instanceof NbtCompound ruleTag) {
+                TradeRule rule = new TradeRule();
+                
+                if (ruleTag.get("items") instanceof NbtList itemsList) {
+                    for (NbtElement itemElement : itemsList) {
+                        if (itemElement instanceof NbtString itemString) {
+                            itemString.asString().ifPresent(idStr -> {
+                                Identifier id = Identifier.tryParse(idStr);
+                                if (id != null && Registries.ITEM.containsId(id)) {
+                                    rule.items.add(Registries.ITEM.get(id));
+                                }
+                            });
+                        }
+                    }
+                }
+                
+                rule.value1 = ruleTag.getInt("value1").orElse(-1);
+                rule.value2 = ruleTag.getInt("value2").orElse(-1);
+                rules.add(rule);
+            }
+        }
     }
 
     private final Setting<Boolean> aura = sgAura.add(new BoolSetting.Builder()
