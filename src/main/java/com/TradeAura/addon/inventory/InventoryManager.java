@@ -142,6 +142,7 @@ public class InventoryManager {
 
         if ((task = evaluateDrop()) != null) return task;
         if ((task = evaluateCompress()) != null) return task;
+        if ((task = evaluateGlassPanes()) != null) return task;
         if ((task = evaluateDecompress()) != null) return task;
         if ((task = evaluateDump()) != null) return task;
         if ((task = evaluateRefill()) != null) return task;
@@ -170,30 +171,42 @@ public class InventoryManager {
     private InvTask evaluateCompress() {
         if (!s.compressEnabled.get() || onCooldown("compress")) return null;
 
-        int emeralds = InvHelper.count(Items.EMERALD);
-        if (emeralds <= s.compressTrigger.get()) return null;
+        return evaluateSurplusCraft(CraftRecipe.CompressEmeralds, s.compressTrigger.get(), s.compressLeave.get());
+    }
 
-        int excess = s.amountMode.get() == AmountMode.ToLimit
-            ? emeralds - s.compressLeave.get()
-            : s.compressTrigger.get() - s.compressLeave.get();
+    private InvTask evaluateGlassPanes() {
+        if (!s.glassPanesEnabled.get() || onCooldown(CraftRecipe.GlassPanes.id())) return null;
 
-        int crafts = Math.min(excess / 9, CraftTask.maxCraftsPerTask());
+        return evaluateSurplusCraft(CraftRecipe.GlassPanes, s.glassTrigger.get(), s.glassLeave.get());
+    }
+
+    /**
+     * Shared logic of every "too many of X -> craft them into Y" trigger (emerald compression, glass panes).
+     */
+    private InvTask evaluateSurplusCraft(CraftRecipe recipe, int trigger, int leave) {
+        int available = InvHelper.count(recipe.input());
+        if (available <= trigger) return null;
+
+        int excess = s.amountMode.get() == AmountMode.ToLimit ? available - leave : trigger - leave;
+
+        int crafts = Math.min(excess / recipe.inputPerCraft(), maxCrafts());
         if (crafts <= 0) return null;
 
-        // Result has to fit somewhere.
-        crafts = Math.min(crafts, InvHelper.freeSpaceFor(Items.EMERALD_BLOCK));
+        // The results have to fit somewhere. The ingredients free up slots while crafting, so this is a
+        // conservative estimate - whatever does not fit is pulled back out of the grid afterwards.
+        crafts = Math.min(crafts, InvHelper.freeSpaceFor(recipe.output()) / recipe.outputPerCraft());
         if (crafts <= 0) {
-            debug("Compress skipped: no room for the emerald blocks");
+            debug(recipe.id() + " skipped: no room for the result");
             return null;
         }
 
-        // A crafting table is mandatory for the 3x3 recipe, without one the trigger simply does not fire.
-        if (CraftTask.findCraftingTable(s.craftingTableRange.get()) == null) {
-            debug("Compress skipped: no crafting table in range");
+        // A crafting table is mandatory for anything bigger than 2x2, without one the trigger does not fire.
+        if (recipe.needsTable() && CraftTask.findCraftingTable(s.craftingTableRange.get()) == null) {
+            debug(recipe.id() + " skipped: no crafting table in range");
             return null;
         }
 
-        return new CraftTask(this, CraftTask.Mode.Compress, crafts);
+        return new CraftTask(this, recipe, crafts);
     }
 
     private InvTask evaluateDecompress() {
@@ -207,7 +220,7 @@ public class InventoryManager {
             : s.decompressLeave.get() - s.decompressTrigger.get();
         if (missing <= 0) return null;
 
-        int crafts = Math.min((missing + 8) / 9, CraftTask.maxCraftsPerTask());
+        int crafts = Math.min((missing + 8) / 9, maxCrafts());
 
         // No blocks in the inventory -> the trigger does not fire.
         int blocks = InvHelper.count(Items.EMERALD_BLOCK);
@@ -220,7 +233,7 @@ public class InventoryManager {
             return null;
         }
 
-        return new CraftTask(this, CraftTask.Mode.Decompress, crafts);
+        return new CraftTask(this, CraftRecipe.DecompressEmeralds, crafts);
     }
 
     private InvTask evaluateDump() {
@@ -278,6 +291,10 @@ public class InventoryManager {
     }
 
     // Helpers
+
+    private int maxCrafts() {
+        return Math.min(s.maxCrafts.get(), CraftTask.MAX_CRAFTS);
+    }
 
     private int amountAbove(ItemRule rule, int total) {
         int amount = s.amountMode.get() == AmountMode.ToLimit ? total - rule.leave : rule.trigger - rule.leave;

@@ -8,12 +8,15 @@ import meteordevelopment.meteorclient.utils.player.SlotUtils;
 import meteordevelopment.meteorclient.utils.world.BlockUtils;
 import net.minecraft.block.Blocks;
 import net.minecraft.block.ShulkerBoxBlock;
+import net.minecraft.entity.ItemEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.screen.ShulkerBoxScreenHandler;
+import net.minecraft.screen.slot.SlotActionType;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.Hand;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.Vec3d;
 
@@ -211,16 +214,27 @@ public class ShulkerTask extends InvTask {
             return failLater("the shulker screen closed unexpectedly");
         }
 
-        if (timedOut()) {
-            setState(State.Close);
+        // Several stacks per tick, otherwise a big dump runs into the action timeout, gets cut short and the
+        // trigger immediately places the very same box again.
+        int batch = Math.max(1, s.transferBatch.get());
+        int moves = 0;
+
+        while (moves < batch) {
+            int moved = mode == Mode.Dump ? transferDump() : transferRefill();
+            if (moved <= 0) break;
+            moves++;
+        }
+
+        if (moves > 0) {
+            stalls = 0;
+            // As long as items keep moving this is not a stall, so the timeout must not run out on us.
+            resetStateTimer();
+            delay = s.actionDelay.get();
             return Status.RUNNING;
         }
 
-        int moved = mode == Mode.Dump ? transferDump() : transferRefill();
-
-        if (moved > 0) {
-            stalls = 0;
-            delay = s.actionDelay.get();
+        if (timedOut()) {
+            setState(State.Close);
             return Status.RUNNING;
         }
 
@@ -248,10 +262,22 @@ public class ShulkerTask extends InvTask {
             int fromId = SlotUtils.indexToId(index);
             if (fromId == -1) continue;
 
-            int toId = InvHelper.findContainerTargetSlot(mc.player.currentScreenHandler, CONTAINER_SLOTS, stack.getItem());
-            if (toId == -1) continue;
+            int wanted = Math.min(entry.remaining, stack.getCount());
+            int moved;
 
-            int moved = InvHelper.moveExact(fromId, toId, Math.min(entry.remaining, stack.getCount()));
+            if (wanted >= stack.getCount()) {
+                // Whole stack: one shift click instead of a pickup / place pair.
+                int before = stack.getCount();
+                InvHelper.click(fromId, 0, SlotActionType.QUICK_MOVE);
+                moved = Math.max(0, before - mc.player.getInventory().getStack(index).getCount());
+            }
+            else {
+                int toId = InvHelper.findContainerTargetSlot(mc.player.currentScreenHandler, CONTAINER_SLOTS, stack.getItem());
+                if (toId == -1) continue;
+
+                moved = InvHelper.moveExact(fromId, toId, wanted);
+            }
+
             entry.remaining -= moved;
             if (moved > 0) return moved;
         }
@@ -270,13 +296,24 @@ public class ShulkerTask extends InvTask {
             }
 
             ItemStack stack = InvHelper.stackInSlotId(fromId);
-            int targetIndex = InvHelper.findTargetIndex(stack.getItem());
-            if (targetIndex == -1) continue;
+            int wanted = Math.min(entry.remaining, stack.getCount());
+            int moved;
 
-            int toId = SlotUtils.indexToId(targetIndex);
-            if (toId == -1) continue;
+            if (wanted >= stack.getCount()) {
+                int before = stack.getCount();
+                InvHelper.click(fromId, 0, SlotActionType.QUICK_MOVE);
+                moved = Math.max(0, before - InvHelper.stackInSlotId(fromId).getCount());
+            }
+            else {
+                int targetIndex = InvHelper.findTargetIndex(stack.getItem());
+                if (targetIndex == -1) continue;
 
-            int moved = InvHelper.moveExact(fromId, toId, Math.min(entry.remaining, stack.getCount()));
+                int toId = SlotUtils.indexToId(targetIndex);
+                if (toId == -1) continue;
+
+                moved = InvHelper.moveExact(fromId, toId, wanted);
+            }
+
             entry.remaining -= moved;
             if (moved > 0) return moved;
         }
@@ -337,7 +374,55 @@ public class ShulkerTask extends InvTask {
             return Status.RUNNING;
         }
 
+        // Items are only picked up on collision, and the box is placed up to a few blocks away, so without
+        // this the shulker (and everything in it) would simply be left on the ground.
+        if (s.walkToDrop.get()) walkToDrop();
+
         return Status.RUNNING;
+    }
+
+    /** Nearest dropped shulker box around the spot the box was broken at. */
+    private ItemEntity findDrop() {
+        Box box = new Box(
+            pos.getX() - 6, pos.getY() - 4, pos.getZ() - 6,
+            pos.getX() + 7, pos.getY() + 5, pos.getZ() + 7
+        );
+
+        ItemEntity best = null;
+        double bestDistance = Double.MAX_VALUE;
+
+        for (ItemEntity entity : mc.world.getEntitiesByClass(ItemEntity.class, box, e -> InvHelper.isShulker(e.getStack()))) {
+            double distance = mc.player.squaredDistanceTo(entity);
+            if (distance >= bestDistance) continue;
+
+            best = entity;
+            bestDistance = distance;
+        }
+
+        return best;
+    }
+
+    private void walkToDrop() {
+        ItemEntity drop = findDrop();
+        if (drop == null) return;
+
+        double dx = drop.getX() - mc.player.getX();
+        double dz = drop.getZ() - mc.player.getZ();
+        double distance = Math.sqrt(dx * dx + dz * dz);
+
+        if (distance < 0.35) return;
+
+        // Entity#getPos() does not exist anymore in 1.21.11, the Entity overloads of Rotations do the same.
+        if (s.rotate.get()) Rotations.rotate(Rotations.getYaw(drop), Rotations.getPitch(drop), 50);
+
+        // Normal walking speed, never overshooting the target.
+        double speed = Math.min(0.2, distance);
+        Vec3d velocity = mc.player.getVelocity();
+
+        double y = velocity.y;
+        if (mc.player.horizontalCollision && mc.player.isOnGround()) y = 0.42;
+
+        mc.player.setVelocity(dx / distance * speed, y, dz / distance * speed);
     }
 
     private Status restore() {

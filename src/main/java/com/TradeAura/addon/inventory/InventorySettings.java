@@ -15,50 +15,64 @@ import java.util.List;
 public class InventorySettings {
     public final SettingGroup group;
 
+    // Not final on purpose: the visibility lambdas of the settings above reference toggles that are only built
+    // further down in the constructor, and a blank final field may not be read before it is assigned - not even
+    // from a lambda that runs long after the constructor finished.
+
     // General
 
-    public final Setting<Boolean> enabled;
-    public final Setting<Integer> actionDelay;
-    public final Setting<Integer> actionTimeout;
-    public final Setting<Integer> failCooldown;
-    public final Setting<Integer> maxChain;
-    public final Setting<Boolean> cancelScreens;
-    public final Setting<AmountMode> amountMode;
+    public Setting<Boolean> enabled;
+    public Setting<Integer> actionDelay;
+    public Setting<Integer> actionTimeout;
+    public Setting<Integer> failCooldown;
+    public Setting<Integer> maxChain;
+    public Setting<Boolean> cancelScreens;
+    public Setting<AmountMode> amountMode;
+    public Setting<Integer> clicksPerTick;
 
     // 2.1 Drop excess items
 
-    public final Setting<Boolean> dropEnabled;
-    public final Setting<DropDirection> dropDirection;
+    public Setting<Boolean> dropEnabled;
+    public Setting<DropDirection> dropDirection;
     public final List<ItemRule> dropRules = new ArrayList<>();
 
     // 2.2 Compress emeralds
 
-    public final Setting<Boolean> compressEnabled;
-    public final Setting<Integer> compressTrigger;
-    public final Setting<Integer> compressLeave;
-    public final Setting<Double> craftingTableRange;
+    public Setting<Boolean> compressEnabled;
+    public Setting<Integer> compressTrigger;
+    public Setting<Integer> compressLeave;
+    public Setting<Double> craftingTableRange;
+    public Setting<Integer> maxCrafts;
 
     // 2.3 Decompress emeralds
 
-    public final Setting<Boolean> decompressEnabled;
-    public final Setting<Integer> decompressTrigger;
-    public final Setting<Integer> decompressLeave;
+    public Setting<Boolean> decompressEnabled;
+    public Setting<Integer> decompressTrigger;
+    public Setting<Integer> decompressLeave;
+
+    // Glass panes (6 glass -> 16 panes)
+
+    public Setting<Boolean> glassPanesEnabled;
+    public Setting<Integer> glassTrigger;
+    public Setting<Integer> glassLeave;
 
     // 2.4 Dump to shulker
 
-    public final Setting<Boolean> dumpEnabled;
+    public Setting<Boolean> dumpEnabled;
     public final List<ItemRule> dumpRules = new ArrayList<>();
 
     // 2.5 Refill from shulker
 
-    public final Setting<Boolean> refillEnabled;
+    public Setting<Boolean> refillEnabled;
     public final List<ItemRule> refillRules = new ArrayList<>();
 
     // Shulker handling
 
-    public final Setting<Boolean> shulkerAutoTool;
-    public final Setting<Boolean> rotate;
-    public final Setting<Integer> shulkerPickupTicks;
+    public Setting<Boolean> shulkerAutoTool;
+    public Setting<Boolean> rotate;
+    public Setting<Integer> shulkerPickupTicks;
+    public Setting<Integer> transferBatch;
+    public Setting<Boolean> walkToDrop;
 
     public InventorySettings(SettingGroup group, Runnable onVisibilityChanged) {
         this.group = group;
@@ -135,6 +149,16 @@ public class InventorySettings {
             .build()
         );
 
+        clicksPerTick = group.add(new IntSetting.Builder()
+            .name("Clicks-per-tick")
+            .description("How many inventory clicks the crafting triggers may send within one tick. Higher is faster, lower is gentler on anticheats.")
+            .defaultValue(64)
+            .min(8)
+            .sliderRange(8, 256)
+            .visible(enabled::get)
+            .build()
+        );
+
         // Drop
 
         dropEnabled = group.add(new BoolSetting.Builder()
@@ -186,11 +210,21 @@ public class InventorySettings {
 
         craftingTableRange = group.add(new DoubleSetting.Builder()
             .name("Crafting-table-range")
-            .description("How far away a crafting table may be for Compress to fire.")
+            .description("How far away a crafting table may be for the table recipes to fire.")
             .defaultValue(4.0)
             .min(1)
             .sliderRange(1, 5)
-            .visible(() -> enabled.get() && compressEnabled.get())
+            .visible(() -> enabled.get() && (compressEnabled.get() || glassPanesEnabled.get()))
+            .build()
+        );
+
+        maxCrafts = group.add(new IntSetting.Builder()
+            .name("Max-crafts-per-action")
+            .description("Upper limit of crafts a single crafting action performs. A grid slot cannot hold more than a stack, so 64 is the maximum.")
+            .defaultValue(CraftTask.MAX_CRAFTS)
+            .min(1)
+            .sliderRange(1, CraftTask.MAX_CRAFTS)
+            .visible(() -> enabled.get() && (compressEnabled.get() || decompressEnabled.get() || glassPanesEnabled.get()))
             .build()
         );
 
@@ -224,6 +258,36 @@ public class InventorySettings {
             .build()
         );
 
+        // Glass panes
+
+        glassPanesEnabled = group.add(new BoolSetting.Builder()
+            .name("Craft-glass-panes")
+            .description("Crafts excess glass into glass panes (6 -> 16). Needs a crafting table in range, otherwise the trigger does not fire.")
+            .defaultValue(false)
+            .visible(enabled::get)
+            .build()
+        );
+
+        glassTrigger = group.add(new IntSetting.Builder()
+            .name("Glass-trigger")
+            .description("Fires when the glass count is above this value.")
+            .defaultValue(64)
+            .min(1)
+            .sliderMax(2304)
+            .visible(() -> enabled.get() && glassPanesEnabled.get())
+            .build()
+        );
+
+        glassLeave = group.add(new IntSetting.Builder()
+            .name("Glass-leave")
+            .description("How much glass stays in the inventory, the rest is crafted into panes.")
+            .defaultValue(0)
+            .min(0)
+            .sliderMax(2304)
+            .visible(() -> enabled.get() && glassPanesEnabled.get())
+            .build()
+        );
+
         // Dump
 
         dumpEnabled = group.add(new BoolSetting.Builder()
@@ -254,10 +318,28 @@ public class InventorySettings {
             .build()
         );
 
+        transferBatch = group.add(new IntSetting.Builder()
+            .name("Transfers-per-tick")
+            .description("How many stacks are moved into / out of the shulker box per tick. Low values make a big dump take forever.")
+            .defaultValue(12)
+            .min(1)
+            .sliderRange(1, 36)
+            .visible(() -> enabled.get() && (dumpEnabled.get() || refillEnabled.get()))
+            .build()
+        );
+
+        walkToDrop = group.add(new BoolSetting.Builder()
+            .name("Walk-to-dropped-shulker")
+            .description("Walk over to the broken shulker box if it landed out of pickup range instead of leaving it behind.")
+            .defaultValue(true)
+            .visible(() -> enabled.get() && (dumpEnabled.get() || refillEnabled.get()))
+            .build()
+        );
+
         shulkerPickupTicks = group.add(new IntSetting.Builder()
             .name("Shulker-pickup-ticks")
-            .description("How long to wait for the broken shulker box to be picked back up.")
-            .defaultValue(40)
+            .description("How long to wait for (and walk towards) the broken shulker box before giving up on it.")
+            .defaultValue(80)
             .min(0)
             .sliderMax(200)
             .visible(() -> enabled.get() && (dumpEnabled.get() || refillEnabled.get()))
