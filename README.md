@@ -27,6 +27,10 @@ Tested successfully with these mods, but other might work as well
 - Toggle "Cancel Event" to turn off villager trading screen pop-ups
 - Toggle "Villager Aura" to automatically interact with villagers in your visual range
     - Toggle "Render" to see result of automatic villager interactions
+
+### Showcase
+
+https://github.com/user-attachments/assets/7e2bc3a1-4222-4728-956b-aa308c9296ab
  
 ## License
 
