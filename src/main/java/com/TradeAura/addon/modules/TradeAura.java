@@ -1,5 +1,9 @@
 package com.TradeAura.addon.modules;
 
+import com.TradeAura.addon.inventory.InventoryManager;
+import com.TradeAura.addon.inventory.InventorySettings;
+import com.TradeAura.addon.inventory.ItemRule;
+
 import meteordevelopment.meteorclient.events.game.OpenScreenEvent;
 import meteordevelopment.meteorclient.events.packets.PacketEvent;
 import meteordevelopment.meteorclient.events.render.Render3DEvent;
@@ -25,7 +29,9 @@ import meteordevelopment.meteorclient.utils.render.color.SettingColor;
 import meteordevelopment.meteorclient.renderer.ShapeMode;
 import meteordevelopment.orbit.EventHandler;
 
+import net.minecraft.client.gui.screen.ingame.CraftingScreen;
 import net.minecraft.client.gui.screen.ingame.MerchantScreen;
+import net.minecraft.client.gui.screen.ingame.ShulkerBoxScreen;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.passive.VillagerEntity;
@@ -64,7 +70,13 @@ public class TradeAura extends Module {
 
     private final SettingGroup sgGeneral = settings.getDefaultGroup();
     private final SettingGroup sgAura = settings.createGroup("Aura");
+    private final SettingGroup sgInventory = settings.createGroup("Inventory manipulation");
     private final SettingGroup sgRender = settings.createGroup("Render");
+
+    /** Every setting of the "Inventory manipulation" tab. */
+    public final InventorySettings invSettings = new InventorySettings(sgInventory, this::rebuildGuiIfPossible);
+    /** Runs the inventory triggers, interrupts the aura while an action is in progress. */
+    private final InventoryManager invManager = new InventoryManager(this, invSettings);
 
     private final Setting<Boolean> Debug = sgGeneral.add(new BoolSetting.Builder()
             .name("Debug")
@@ -106,11 +118,21 @@ public class TradeAura extends Module {
     private final List<TradeRule> buyRules = new ArrayList<>();
     private final List<TradeRule> sellRules = new ArrayList<>();
 
+    private GuiTheme lastTheme;
+    private WVerticalList lastList;
+
     @Override
     public WWidget getWidget(GuiTheme theme) {
         WVerticalList list = theme.verticalList();
+        lastTheme = theme;
+        lastList = list;
         rebuildGui(theme, list);
         return list;
+    }
+
+    /** Called when an "Inventory manipulation" toggle changes so the rule tables appear / disappear with it. */
+    private void rebuildGuiIfPossible() {
+        if (lastTheme != null && lastList != null) rebuildGui(lastTheme, lastList);
     }
 
     private void rebuildGui(GuiTheme theme, WVerticalList rootList) {
@@ -159,6 +181,81 @@ public class TradeAura extends Module {
             sellRules.add(rule);
             rebuildGui(theme, rootList);
         };
+
+        if (!invSettings.enabled.get()) return;
+
+        if (invSettings.dropEnabled.get()) {
+            addItemRuleSection(theme, rootList, "Drop Rules", invSettings.dropRules,
+                "Drop above", "Keep", "Add Drop Rule", 64, 32);
+        }
+
+        if (invSettings.dumpEnabled.get()) {
+            addItemRuleSection(theme, rootList, "Dump Rules", invSettings.dumpRules,
+                "Dump above", "Keep", "Add Dump Rule", 64, 32);
+        }
+
+        if (invSettings.refillEnabled.get()) {
+            addItemRuleSection(theme, rootList, "Refill Rules", invSettings.refillRules,
+                "Refill below", "Fill to", "Add Refill Rule", 32, 64);
+        }
+    }
+
+    /** One table of {@link ItemRule}s, built in the same style as the buy / sell rules above. */
+    private void addItemRuleSection(GuiTheme theme, WVerticalList rootList, String title, List<ItemRule> rules,
+                                    String triggerLabel, String leaveLabel, String addLabel,
+                                    int defaultTrigger, int defaultLeave) {
+        rootList.add(theme.horizontalSeparator()).expandX();
+
+        WSection section = rootList.add(theme.section(title, true)).expandX().widget();
+        WTable table = section.add(theme.table()).expandX().widget();
+
+        table.add(theme.label("Items")).expandX();
+        table.add(theme.label(triggerLabel)).minWidth(70);
+        table.add(theme.label(leaveLabel)).minWidth(70);
+        table.add(theme.label(""));
+        table.row();
+
+        for (ItemRule rule : rules) {
+            addItemRuleRow(theme, table, rules, rule, rootList);
+        }
+
+        rootList.add(theme.button(addLabel)).expandX().widget().action = () -> {
+            rules.add(new ItemRule(defaultTrigger, defaultLeave));
+            rebuildGui(theme, rootList);
+        };
+    }
+
+    private void addItemRuleRow(GuiTheme theme, WTable table, List<ItemRule> rules, ItemRule rule, WVerticalList rootList) {
+        Setting<List<Item>> itemSetting = new ItemListSetting.Builder()
+            .name("items")
+            .description("Items for this rule")
+            .defaultValue(new ArrayList<>(rule.items))
+            .onChanged(items -> {
+                rule.items.clear();
+                rule.items.addAll(items);
+            })
+            .build();
+
+        Settings dummySettings = new Settings();
+        SettingGroup hiddenGroup = dummySettings.createGroup("");
+        hiddenGroup.sectionExpanded = true;
+        hiddenGroup.add(itemSetting);
+
+        table.add(theme.settings(dummySettings)).expandX().top();
+
+        WIntEdit triggerEdit = table.add(theme.intEdit(rule.trigger, 0, 10000, false)).minWidth(70).top().widget();
+        triggerEdit.action = () -> rule.trigger = triggerEdit.get();
+
+        WIntEdit leaveEdit = table.add(theme.intEdit(rule.leave, 0, 10000, false)).minWidth(70).top().widget();
+        leaveEdit.action = () -> rule.leave = leaveEdit.get();
+
+        WMinus removeBtn = table.add(theme.minus()).top().widget();
+        removeBtn.action = () -> {
+            rules.remove(rule);
+            rebuildGui(theme, rootList);
+        };
+
+        table.row();
     }
 
     private void addRuleRow(GuiTheme theme, WTable table, TradeRule rule, boolean isSell, WVerticalList rootList) {
@@ -200,6 +297,9 @@ public class TradeAura extends Module {
         NbtCompound tag = super.toTag();
         tag.put("buyRules", rulesToTag(buyRules));
         tag.put("sellRules", rulesToTag(sellRules));
+        tag.put("dropRules", ItemRule.listToTag(invSettings.dropRules));
+        tag.put("dumpRules", ItemRule.listToTag(invSettings.dumpRules));
+        tag.put("refillRules", ItemRule.listToTag(invSettings.refillRules));
         return tag;
     }
 
@@ -214,6 +314,15 @@ public class TradeAura extends Module {
         }
         if (tag.get("sellRules") instanceof NbtList sellList) {
             rulesFromTag(sellList, sellRules);
+        }
+        if (tag.get("dropRules") instanceof NbtList dropList) {
+            ItemRule.listFromTag(dropList, invSettings.dropRules);
+        }
+        if (tag.get("dumpRules") instanceof NbtList dumpList) {
+            ItemRule.listFromTag(dumpList, invSettings.dumpRules);
+        }
+        if (tag.get("refillRules") instanceof NbtList refillList) {
+            ItemRule.listFromTag(refillList, invSettings.refillRules);
         }
         
         return this;
@@ -342,6 +451,34 @@ public class TradeAura extends Module {
             .build()
     );
 
+    private final Setting<Boolean> refreshUnsynced = sgAura.add(new BoolSetting.Builder()
+            .name("Refresh-unsynced-cooldown")
+            .description("If a villager never synced properly (it is still rendered with the default color), force its cooldown to refresh so the aura retries the interaction.")
+            .defaultValue(true)
+            .visible(aura::get)
+            .build()
+    );
+
+    private final Setting<Integer> refreshDelay = sgAura.add(new IntSetting.Builder()
+            .name("Refresh-delay")
+            .description("How many aura cycles (Ticks-to-wait each) to give the server to answer before the cooldown of an unsynced villager is refreshed.")
+            .defaultValue(6)
+            .min(1)
+            .sliderMax(60)
+            .visible(() -> aura.get() && refreshUnsynced.get())
+            .build()
+    );
+
+    private final Setting<Integer> maxRefreshes = sgAura.add(new IntSetting.Builder()
+            .name("Max-refreshes")
+            .description("How often the same villager may be retried in a row before it is left alone until 'forget-after' expires. Stops the aura from spamming a villager that never answers.")
+            .defaultValue(3)
+            .min(1)
+            .sliderMax(20)
+            .visible(() -> aura.get() && refreshUnsynced.get())
+            .build()
+    );
+
     private final Setting<Boolean> render = sgRender.add(new BoolSetting.Builder()
             .name("Render")
             .description("Renders villagers that you've clicked")
@@ -430,10 +567,17 @@ public class TradeAura extends Module {
 
     private final List<Entity> targets = new ArrayList<>();
     private final Map<Entity, Pair<Integer, Color>> VillagerCooldown = new HashMap<>();
+    /** How often an unsynced villager has been retried in a row, see 'Refresh-unsynced-cooldown'. */
+    private final Map<Entity, Integer> refreshCount = new HashMap<>();
 
     private int ticker = 0;
     private int ticker_close = 0;
     private boolean pendingClose = false;
+
+    /** Used by the inventory manager for its debug output. */
+    public boolean isDebug() {
+        return Debug.get();
+    }
 
     private int countItemInInventory(Item item) {
         FindItemResult result = InvUtils.find(item);
@@ -444,9 +588,13 @@ public class TradeAura extends Module {
     public void onActivate() {
         targets.clear();
         VillagerCooldown.clear();
+        refreshCount.clear();
         ticker = 0;
         ticker_close = 0;
         pendingClose = false;
+
+        invManager.reset();
+        invManager.reportConflicts();
     }
 
     @Override
@@ -458,15 +606,24 @@ public class TradeAura extends Module {
 
         targets.clear();
         VillagerCooldown.clear();
+        refreshCount.clear();
         ticker = 0;
         ticker_close = 0;
         pendingClose = false;
+
+        invManager.reset();
     }
 
     @EventHandler
     private void onOpenScreen(OpenScreenEvent event) {
-        if (!(event.screen instanceof MerchantScreen)) return;
-        if (CancelEvent.get()) event.cancel();
+        if (event.screen instanceof MerchantScreen) {
+            if (CancelEvent.get()) event.cancel();
+            return;
+        }
+
+        // Screens the inventory tasks open themselves, the handler is set either way.
+        if (!invSettings.cancelScreens.get() || !invManager.isBusy()) return;
+        if (event.screen instanceof ShulkerBoxScreen || event.screen instanceof CraftingScreen) event.cancel();
     }
 
     @EventHandler
@@ -488,6 +645,9 @@ public class TradeAura extends Module {
             Pair<Integer, Color> newPair = VillagerCooldown.get(remember_entity);
             newPair.setRight(clr);
             VillagerCooldown.replace(remember_entity, newPair);
+
+            // The villager answered, so it is not "unsynced" anymore.
+            if (!clr.equals(defaultColor.get())) refreshCount.remove(remember_entity);
         }
     }
 
@@ -745,9 +905,39 @@ public class TradeAura extends Module {
         return !anyValidTrade; 
     }
 
+    /**
+     * An entity that is still rendered with the default color never made it past
+     * {@link #syncing_func(MerchantScreenHandler)}, which means the interaction was lost. Dropping it from the
+     * cooldown map makes the aura interact with it again on this very tick.
+     */
+    private boolean shouldRefreshCooldown(Entity target) {
+        if (!refreshUnsynced.get()) return false;
+
+        Pair<Integer, Color> entry = VillagerCooldown.get(target);
+        if (entry == null) return false;
+        if (!entry.getRight().equals(defaultColor.get())) return false;
+        if (entry.getLeft() < refreshDelay.get()) return false;
+
+        int tries = refreshCount.getOrDefault(target, 0);
+        if (tries >= maxRefreshes.get()) return false;
+
+        refreshCount.put(target, tries + 1);
+        if (Debug.get()) info("Villager never synced, forcing a cooldown refresh (try " + (tries + 1) + "/" + maxRefreshes.get() + ")");
+        return true;
+    }
+
     @EventHandler
     private void onTick(TickEvent.Pre event) {
+        if (mc.player == null || mc.world == null) return;
         if (!mc.player.isAlive() || PlayerUtils.getGameMode() == GameMode.SPECTATOR) return;
+
+        // Inventory manipulation always wins: while an action runs the aura stands down completely.
+        if (aura.get() && invManager.tick()) {
+            ticker = 0;
+            ticker_close = 0;
+            pendingClose = false;
+            return;
+        }
 
         if (++ticker < ticks_to_wait.get()) {
             if (aura.get() && cancelMovement.get()) {
@@ -774,26 +964,29 @@ public class TradeAura extends Module {
         TargetUtils.getList(targets, this::entityCheck, priority.get(), maxTargets.get());
 
         for (Entity targett : targets) {
-            if (!VillagerCooldown.containsKey(targett)) {
-                if (shouldSkipVillager(targett)) {
-                    if (Debug.get()) info("Skipped villager (pre-check: no valid trades possible).");
-                    VillagerCooldown.put(targett, new Pair<>(0, limitReachedColor.get()));
-                    continue;
-                }
-
-                remember_entity = targett;
-                VillagerCooldown.put(targett, new Pair<>(0, defaultColor.get()));
-                if (rotateToVillager.get()) {
-                    VillagerInteract(targett);
-                } else {
-                    if (Debug.get()) info("Rotation disabled, interacting without rotating.");
-                    ActionResult actionResult = mc.interactionManager.interactEntity(mc.player, targett, Hand.MAIN_HAND);
-                    if (!actionResult.isAccepted() && Debug.get()) {
-                        info("Aura interaction was not accepted.");
-                    }
-                }
-                break;
+            if (VillagerCooldown.containsKey(targett)) {
+                if (!shouldRefreshCooldown(targett)) continue;
+                VillagerCooldown.remove(targett);
             }
+
+            if (shouldSkipVillager(targett)) {
+                if (Debug.get()) info("Skipped villager (pre-check: no valid trades possible).");
+                VillagerCooldown.put(targett, new Pair<>(0, limitReachedColor.get()));
+                continue;
+            }
+
+            remember_entity = targett;
+            VillagerCooldown.put(targett, new Pair<>(0, defaultColor.get()));
+            if (rotateToVillager.get()) {
+                VillagerInteract(targett);
+            } else {
+                if (Debug.get()) info("Rotation disabled, interacting without rotating.");
+                ActionResult actionResult = mc.interactionManager.interactEntity(mc.player, targett, Hand.MAIN_HAND);
+                if (!actionResult.isAccepted() && Debug.get()) {
+                    info("Aura interaction was not accepted.");
+                }
+            }
+            break;
         }
 
         for (Map.Entry<Entity, Pair<Integer, Color>> e : new HashMap<>(VillagerCooldown).entrySet()) {
@@ -801,6 +994,7 @@ public class TradeAura extends Module {
             Color clr = e.getValue().getRight();
             if (time > forget.get()) {
                 VillagerCooldown.remove(e.getKey());
+                refreshCount.remove(e.getKey());
             } else {
                 VillagerCooldown.replace(e.getKey(), new Pair<>(time + 1, clr));
             }
