@@ -52,223 +52,19 @@ import net.minecraft.util.math.Vec3d;
 import net.minecraft.village.Merchant;
 import net.minecraft.village.TradeOffer;
 import net.minecraft.village.TradeOfferList;
-import net.minecraft.village.VillagerProfession;
 import net.minecraft.world.GameMode;
 import org.apache.commons.lang3.reflect.FieldUtils;
-import net.minecraft.registry.entry.RegistryEntry;
-import net.minecraft.village.VillagerData;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 public class TradeAura extends Module {
 
     private final SettingGroup sgGeneral = settings.getDefaultGroup();
     private final SettingGroup sgAura = settings.createGroup("Aura");
     private final SettingGroup sgRender = settings.createGroup("Render");
-
-    // --- VILLAGER TRADES HARDCODE ---
-    private static final Map<Item, Set<String>> VILLAGER_BUYS = new HashMap<>();
-    private static final Map<Item, Set<String>> VILLAGER_SELLS = new HashMap<>();
-
-    static {
-        // ==================Selling (villager buys from us)==================
-        // Farmer
-        VILLAGER_BUYS.put(Items.WHEAT, Set.of("farmer"));
-        VILLAGER_BUYS.put(Items.POTATO, Set.of("farmer"));
-        VILLAGER_BUYS.put(Items.CARROT, Set.of("farmer"));
-        VILLAGER_BUYS.put(Items.BEETROOT, Set.of("farmer"));
-        VILLAGER_BUYS.put(Items.PUMPKIN, Set.of("farmer"));
-        VILLAGER_BUYS.put(Items.MELON_SLICE, Set.of("farmer"));
-        
-        // Librarian & Cartographer
-        VILLAGER_BUYS.put(Items.PAPER, Set.of("cartographer", "librarian"));
-        VILLAGER_BUYS.put(Items.GLASS_PANE, Set.of("cartographer"));
-        VILLAGER_BUYS.put(Items.COMPASS, Set.of("cartographer"));
-        VILLAGER_BUYS.put(Items.BOOK, Set.of("librarian"));
-        VILLAGER_BUYS.put(Items.INK_SAC, Set.of("librarian"));
-        
-        // Fletcher & Fisherman
-        VILLAGER_BUYS.put(Items.STRING, Set.of("fletcher", "fisherman"));
-        VILLAGER_BUYS.put(Items.FEATHER, Set.of("fletcher"));
-        VILLAGER_BUYS.put(Items.STICK, Set.of("fletcher"));
-        VILLAGER_BUYS.put(Items.FLINT, Set.of("fletcher", "toolsmith", "weaponsmith"));
-        VILLAGER_BUYS.put(Items.COD, Set.of("fisherman"));
-        VILLAGER_BUYS.put(Items.SALMON, Set.of("fisherman"));
-        
-        // Armorer, Weaponsmith, Toolsmith
-        VILLAGER_BUYS.put(Items.RAW_IRON, Set.of("armorer", "weaponsmith", "toolsmith"));
-        VILLAGER_BUYS.put(Items.IRON_INGOT, Set.of("armorer", "weaponsmith", "toolsmith"));
-        VILLAGER_BUYS.put(Items.RAW_GOLD, Set.of("armorer"));
-        VILLAGER_BUYS.put(Items.GOLD_INGOT, Set.of("cleric"));
-        VILLAGER_BUYS.put(Items.RAW_COPPER, Set.of("armorer"));
-        VILLAGER_BUYS.put(Items.COAL, Set.of("armorer", "weaponsmith", "toolsmith", "butcher", "fisherman"));
-        VILLAGER_BUYS.put(Items.DIAMOND, Set.of("armorer", "weaponsmith", "toolsmith"));
-        VILLAGER_BUYS.put(Items.LAPIS_LAZULI, Set.of("cleric", "armorer"));
-        VILLAGER_BUYS.put(Items.REDSTONE, Set.of("cleric"));
-        
-        // Cleric
-        VILLAGER_BUYS.put(Items.ROTTEN_FLESH, Set.of("cleric"));
-        VILLAGER_BUYS.put(Items.RABBIT_FOOT, Set.of("cleric"));
-        VILLAGER_BUYS.put(Items.GLASS_BOTTLE, Set.of("cleric"));
-        VILLAGER_BUYS.put(Items.NETHER_WART, Set.of("cleric"));
-        
-        // Leatherworker
-        VILLAGER_BUYS.put(Items.LEATHER, Set.of("leatherworker"));
-        VILLAGER_BUYS.put(Items.RABBIT_HIDE, Set.of("leatherworker"));
-        VILLAGER_BUYS.put(Items.TURTLE_SCUTE, Set.of("leatherworker"));
-        
-        // Butcher
-        VILLAGER_BUYS.put(Items.MUTTON, Set.of("butcher"));
-        VILLAGER_BUYS.put(Items.PORKCHOP, Set.of("butcher"));
-        VILLAGER_BUYS.put(Items.CHICKEN, Set.of("butcher"));
-        VILLAGER_BUYS.put(Items.BEEF, Set.of("butcher"));
-        
-        // Mason (Stone Mason)
-        VILLAGER_BUYS.put(Items.CLAY_BALL, Set.of("mason"));
-        VILLAGER_BUYS.put(Items.STONE, Set.of("mason"));
-        VILLAGER_BUYS.put(Items.GRANITE, Set.of("mason"));
-        VILLAGER_BUYS.put(Items.ANDESITE, Set.of("mason"));
-        VILLAGER_BUYS.put(Items.DIORITE, Set.of("mason"));
-        VILLAGER_BUYS.put(Items.NETHERRACK, Set.of("mason"));
-        VILLAGER_BUYS.put(Items.BLACKSTONE, Set.of("mason"));
-        VILLAGER_BUYS.put(Items.END_STONE, Set.of("mason"));
-        VILLAGER_BUYS.put(Items.TERRACOTTA, Set.of("mason"));
-
-        // Shepherd
-        VILLAGER_BUYS.put(Items.WHITE_WOOL, Set.of("shepherd"));
-        VILLAGER_BUYS.put(Items.BLACK_WOOL, Set.of("shepherd"));
-        VILLAGER_BUYS.put(Items.GRAY_WOOL, Set.of("shepherd"));
-        VILLAGER_BUYS.put(Items.BROWN_WOOL, Set.of("shepherd"));
-        VILLAGER_BUYS.put(Items.WHITE_DYE, Set.of("shepherd"));
-        VILLAGER_BUYS.put(Items.BLACK_DYE, Set.of("shepherd"));
-        VILLAGER_BUYS.put(Items.BROWN_DYE, Set.of("shepherd"));
-        VILLAGER_BUYS.put(Items.BLUE_DYE, Set.of("shepherd"));
-
-        // ==================Buying (villager sells to us)==================
-        // Farmer
-        VILLAGER_SELLS.put(Items.BREAD, Set.of("farmer"));
-        VILLAGER_SELLS.put(Items.APPLE, Set.of("farmer"));
-        VILLAGER_SELLS.put(Items.PUMPKIN_PIE, Set.of("farmer"));
-        VILLAGER_SELLS.put(Items.COOKIE, Set.of("farmer"));
-        VILLAGER_SELLS.put(Items.CAKE, Set.of("farmer"));
-        VILLAGER_SELLS.put(Items.GOLDEN_CARROT, Set.of("farmer"));
-        VILLAGER_SELLS.put(Items.GLISTERING_MELON_SLICE, Set.of("farmer"));
-        VILLAGER_SELLS.put(Items.SUSPICIOUS_STEW, Set.of("farmer"));
-        
-        // Librarian & Cartographer
-        VILLAGER_SELLS.put(Items.GLASS, Set.of("librarian"));
-        VILLAGER_SELLS.put(Items.ENCHANTED_BOOK, Set.of("librarian"));
-        VILLAGER_SELLS.put(Items.BOOKSHELF, Set.of("librarian", "cleric"));
-        VILLAGER_SELLS.put(Items.NAME_TAG, Set.of("librarian"));
-        VILLAGER_SELLS.put(Items.CLOCK, Set.of("librarian"));
-        VILLAGER_SELLS.put(Items.LANTERN, Set.of("librarian"));
-        VILLAGER_SELLS.put(Items.COMPASS, Set.of("librarian"));
-        
-        VILLAGER_SELLS.put(Items.MAP, Set.of("cartographer"));
-        VILLAGER_SELLS.put(Items.FILLED_MAP, Set.of("cartographer"));
-        VILLAGER_SELLS.put(Items.ITEM_FRAME, Set.of("cartographer"));
-        VILLAGER_SELLS.put(Items.CARTOGRAPHY_TABLE, Set.of("cartographer"));
-        VILLAGER_SELLS.put(Items.WHITE_BANNER, Set.of("cartographer", "shepherd"));
-        VILLAGER_SELLS.put(Items.RED_BANNER, Set.of("cartographer", "shepherd"));
-        VILLAGER_SELLS.put(Items.BLUE_BANNER, Set.of("cartographer", "shepherd"));
-        
-        // Fletcher & Fisherman
-        VILLAGER_SELLS.put(Items.ARROW, Set.of("fletcher"));
-        VILLAGER_SELLS.put(Items.BOW, Set.of("fletcher"));
-        VILLAGER_SELLS.put(Items.CROSSBOW, Set.of("fletcher"));
-        VILLAGER_SELLS.put(Items.FLINT_AND_STEEL, Set.of("fletcher"));
-        VILLAGER_SELLS.put(Items.TIPPED_ARROW, Set.of("fletcher"));
-        
-        VILLAGER_SELLS.put(Items.COOKED_COD, Set.of("fisherman"));
-        VILLAGER_SELLS.put(Items.COOKED_SALMON, Set.of("fisherman"));
-        VILLAGER_SELLS.put(Items.FISHING_ROD, Set.of("fisherman"));
-        VILLAGER_SELLS.put(Items.COD_BUCKET, Set.of("fisherman"));
-        VILLAGER_SELLS.put(Items.CAMPFIRE, Set.of("fisherman"));
-        
-        // Armorer
-        VILLAGER_SELLS.put(Items.IRON_HELMET, Set.of("armorer"));
-        VILLAGER_SELLS.put(Items.IRON_CHESTPLATE, Set.of("armorer"));
-        VILLAGER_SELLS.put(Items.IRON_LEGGINGS, Set.of("armorer"));
-        VILLAGER_SELLS.put(Items.IRON_BOOTS, Set.of("armorer"));
-        VILLAGER_SELLS.put(Items.SHIELD, Set.of("armorer"));
-        VILLAGER_SELLS.put(Items.CHAINMAIL_HELMET, Set.of("armorer"));
-        VILLAGER_SELLS.put(Items.CHAINMAIL_CHESTPLATE, Set.of("armorer"));
-        VILLAGER_SELLS.put(Items.CHAINMAIL_LEGGINGS, Set.of("armorer"));
-        VILLAGER_SELLS.put(Items.CHAINMAIL_BOOTS, Set.of("armorer"));
-        VILLAGER_SELLS.put(Items.DIAMOND_HELMET, Set.of("armorer"));
-        VILLAGER_SELLS.put(Items.DIAMOND_CHESTPLATE, Set.of("armorer"));
-        VILLAGER_SELLS.put(Items.DIAMOND_LEGGINGS, Set.of("armorer"));
-        VILLAGER_SELLS.put(Items.DIAMOND_BOOTS, Set.of("armorer"));
-        VILLAGER_SELLS.put(Items.BELL, Set.of("armorer", "weaponsmith", "toolsmith"));
-        
-        // Weaponsmith
-        VILLAGER_SELLS.put(Items.STONE_AXE, Set.of("weaponsmith", "toolsmith"));
-        VILLAGER_SELLS.put(Items.STONE_SWORD, Set.of("weaponsmith"));
-        VILLAGER_SELLS.put(Items.IRON_SWORD, Set.of("weaponsmith"));
-        VILLAGER_SELLS.put(Items.IRON_AXE, Set.of("weaponsmith", "toolsmith"));
-        VILLAGER_SELLS.put(Items.DIAMOND_SWORD, Set.of("weaponsmith"));
-        VILLAGER_SELLS.put(Items.DIAMOND_AXE, Set.of("weaponsmith", "toolsmith"));
-        
-        // Toolsmith
-        VILLAGER_SELLS.put(Items.STONE_PICKAXE, Set.of("toolsmith"));
-        VILLAGER_SELLS.put(Items.STONE_SHOVEL, Set.of("toolsmith"));
-        VILLAGER_SELLS.put(Items.STONE_HOE, Set.of("toolsmith"));
-        VILLAGER_SELLS.put(Items.IRON_PICKAXE, Set.of("toolsmith"));
-        VILLAGER_SELLS.put(Items.IRON_SHOVEL, Set.of("toolsmith"));
-        VILLAGER_SELLS.put(Items.IRON_HOE, Set.of("toolsmith"));
-        VILLAGER_SELLS.put(Items.DIAMOND_PICKAXE, Set.of("toolsmith"));
-        VILLAGER_SELLS.put(Items.DIAMOND_SHOVEL, Set.of("toolsmith"));
-        VILLAGER_SELLS.put(Items.DIAMOND_HOE, Set.of("toolsmith"));
-        
-        // Leatherworker
-        VILLAGER_SELLS.put(Items.LEATHER_HELMET, Set.of("leatherworker"));
-        VILLAGER_SELLS.put(Items.LEATHER_CHESTPLATE, Set.of("leatherworker"));
-        VILLAGER_SELLS.put(Items.LEATHER_LEGGINGS, Set.of("leatherworker"));
-        VILLAGER_SELLS.put(Items.LEATHER_BOOTS, Set.of("leatherworker"));
-        VILLAGER_SELLS.put(Items.SADDLE, Set.of("leatherworker"));
-        VILLAGER_SELLS.put(Items.LEATHER_HORSE_ARMOR, Set.of("leatherworker"));
-        VILLAGER_SELLS.put(Items.WOLF_ARMOR, Set.of("leatherworker")); // Новинка из 1.20.5+
-        
-        // Cleric
-        VILLAGER_SELLS.put(Items.ENDER_PEARL, Set.of("cleric"));
-        VILLAGER_SELLS.put(Items.GLOWSTONE, Set.of("cleric"));
-        VILLAGER_SELLS.put(Items.EXPERIENCE_BOTTLE, Set.of("cleric"));
-        VILLAGER_SELLS.put(Items.REDSTONE, Set.of("cleric"));
-        VILLAGER_SELLS.put(Items.LAPIS_LAZULI, Set.of("cleric"));
-        VILLAGER_SELLS.put(Items.ENDER_EYE, Set.of("cleric"));
-        
-        // Butcher
-        VILLAGER_SELLS.put(Items.COOKED_MUTTON, Set.of("butcher"));
-        VILLAGER_SELLS.put(Items.COOKED_PORKCHOP, Set.of("butcher"));
-        VILLAGER_SELLS.put(Items.COOKED_CHICKEN, Set.of("butcher"));
-        VILLAGER_SELLS.put(Items.COOKED_BEEF, Set.of("butcher"));
-        VILLAGER_SELLS.put(Items.RABBIT_STEW, Set.of("butcher"));
-        
-        // Mason
-        VILLAGER_SELLS.put(Items.BRICK, Set.of("mason"));
-        VILLAGER_SELLS.put(Items.QUARTZ, Set.of("mason"));
-        VILLAGER_SELLS.put(Items.DRIPSTONE_BLOCK, Set.of("mason"));
-        VILLAGER_SELLS.put(Items.CHISELED_STONE_BRICKS, Set.of("mason"));
-        VILLAGER_SELLS.put(Items.POLISHED_GRANITE, Set.of("mason"));
-        VILLAGER_SELLS.put(Items.POLISHED_ANDESITE, Set.of("mason"));
-        VILLAGER_SELLS.put(Items.POLISHED_DIORITE, Set.of("mason"));
-        VILLAGER_SELLS.put(Items.QUARTZ_BLOCK, Set.of("mason"));
-        VILLAGER_SELLS.put(Items.QUARTZ_PILLAR, Set.of("mason"));
-        
-        // Shepherd
-        VILLAGER_SELLS.put(Items.SHEARS, Set.of("shepherd"));
-        VILLAGER_SELLS.put(Items.WHITE_BED, Set.of("shepherd"));
-        VILLAGER_SELLS.put(Items.BLACK_BED, Set.of("shepherd"));
-        VILLAGER_SELLS.put(Items.RED_BED, Set.of("shepherd"));
-        VILLAGER_SELLS.put(Items.BLUE_BED, Set.of("shepherd"));
-        VILLAGER_SELLS.put(Items.WHITE_CARPET, Set.of("shepherd"));
-        VILLAGER_SELLS.put(Items.BLACK_CARPET, Set.of("shepherd"));
-        VILLAGER_SELLS.put(Items.PAINTING, Set.of("shepherd"));
-    }
 
     private final Setting<Boolean> Debug = sgGeneral.add(new BoolSetting.Builder()
             .name("Debug")
@@ -482,6 +278,32 @@ public class TradeAura extends Module {
             .build()
     );
 
+    private final Setting<Boolean> rotateToVillager = sgAura.add(new BoolSetting.Builder()
+            .name("Rotate-to-villager")
+            .description("Look at the villager before interacting")
+            .defaultValue(true)
+            .visible(aura::get)
+            .build()
+    );
+
+    private final Setting<Boolean> cancelMovement = sgAura.add(new BoolSetting.Builder()
+            .name("Cancel-Movement")
+            .description("Cancel player movement input when the next aura interaction is close")
+            .defaultValue(false)
+            .visible(aura::get)
+            .build()
+    );
+
+    private final Setting<Integer> ticks_to_cancel_movement = sgAura.add(new IntSetting.Builder()
+            .name("Ticks-to-cancel-movement")
+            .description("Cancel movement when fewer than this many ticks remain until the next aura interaction")
+            .defaultValue(2)
+            .min(0)
+            .sliderMax(20)
+            .visible(() -> aura.get() && cancelMovement.get())
+            .build()
+    );
+
     private final Setting<SortPriority> priority = sgAura.add(new EnumSetting.Builder<SortPriority>()
             .name("priority")
             .description("How to filter villagers within range.")
@@ -524,13 +346,14 @@ public class TradeAura extends Module {
             .name("Render")
             .description("Renders villagers that you've clicked")
             .defaultValue(false)
+            .visible(aura::get)
             .build()
     );
 
     public final Setting<Double> fillOpacity = sgRender.add(new DoubleSetting.Builder()
             .name("fill-opacity")
             .description("The opacity of the shape fill.")
-            .visible(render::get)
+            .visible(() -> aura.get() && render.get())
             .defaultValue(0.3)
             .range(0, 1)
             .sliderMax(1)
@@ -541,7 +364,7 @@ public class TradeAura extends Module {
             .name("default-color")
             .description("Color for unsynced actions")
             .defaultValue(new SettingColor(160, 160, 160))
-            .visible(render::get)
+            .visible(() -> aura.get() && render.get())
             .build()
     );
 
@@ -549,7 +372,7 @@ public class TradeAura extends Module {
             .name("no-emerald-color")
             .description("Color for no emeralds in inventory")
             .defaultValue(new SettingColor(0, 170, 255))
-            .visible(render::get)
+            .visible(() -> aura.get() && render.get())
             .build()
     );
 
@@ -557,7 +380,7 @@ public class TradeAura extends Module {
             .name("no-sell-item-color")
             .description("Color for no sellable items in inventory")
             .defaultValue(new SettingColor(200, 200, 200))
-            .visible(render::get)
+            .visible(() -> aura.get() && render.get())
             .build()
     );
 
@@ -565,7 +388,7 @@ public class TradeAura extends Module {
             .name("no-trades")
             .description("Color for no villager trades in trade list ")
             .defaultValue(new SettingColor(255, 45, 45))
-            .visible(render::get)
+            .visible(() -> aura.get() && render.get())
             .build()
     );
 
@@ -573,7 +396,7 @@ public class TradeAura extends Module {
             .name("disabled-trade-color")
             .description("Color for a trade on a cooldown")
             .defaultValue(new SettingColor(255, 210, 0))
-            .visible(render::get)
+            .visible(() -> aura.get() && render.get())
             .build()
     );
 
@@ -581,7 +404,7 @@ public class TradeAura extends Module {
             .name("too-expensive-color")
             .description("Color for a high priced trade")
             .defaultValue(new SettingColor(255, 0, 150))
-            .visible(render::get)
+            .visible(() -> aura.get() && render.get())
             .build()
     );
 
@@ -589,7 +412,7 @@ public class TradeAura extends Module {
             .name("limit-reached-color")
             .description("Color for when the per-item inventory limit has been reached")
             .defaultValue(new SettingColor(255, 140, 0))
-            .visible(render::get)
+            .visible(() -> aura.get() && render.get())
             .build()
     );
 
@@ -597,7 +420,7 @@ public class TradeAura extends Module {
             .name("purchase-color")
             .description("Color for a successfull trade")
             .defaultValue(new SettingColor(45, 255, 45))
-            .visible(render::get)
+            .visible(() -> aura.get() && render.get())
             .build()
     );
 
@@ -619,6 +442,20 @@ public class TradeAura extends Module {
 
     @Override
     public void onActivate() {
+        targets.clear();
+        VillagerCooldown.clear();
+        ticker = 0;
+        ticker_close = 0;
+        pendingClose = false;
+    }
+
+    @Override
+    public void onDeactivate() {
+        if (mc.player != null && mc.player.currentScreenHandler != null) {
+            mc.player.closeHandledScreen();
+            mc.player.getInventory().updateItems();
+        }
+
         targets.clear();
         VillagerCooldown.clear();
         ticker = 0;
@@ -648,9 +485,9 @@ public class TradeAura extends Module {
 
     private void updateColor(Color clr) {
         if (VillagerCooldown.containsKey(remember_entity)) {
-            Pair new_pair = VillagerCooldown.get(remember_entity);
-            new_pair.setRight(clr);
-            VillagerCooldown.replace(remember_entity, new_pair);
+            Pair<Integer, Color> newPair = VillagerCooldown.get(remember_entity);
+            newPair.setRight(clr);
+            VillagerCooldown.replace(remember_entity, newPair);
         }
     }
 
@@ -821,12 +658,36 @@ public class TradeAura extends Module {
             ActionResult actionResultDirect = mc.interactionManager.interactEntity(mc.player, villager, Hand.MAIN_HAND);
             if (Debug.get()) info("Raycast didn't find a target");
         } else {
-            lookAtVillager(playerPos, villagerPos);
+            if (rotateToVillager.get()) {
+                lookAtVillager(playerPos, villagerPos);
+            }
             ActionResult actionResult = mc.interactionManager.interactEntityAtLocation(mc.player, villager, entityHitResult, Hand.MAIN_HAND);
             if (!actionResult.isAccepted()) {
                 ActionResult actionResultDirect = mc.interactionManager.interactEntity(mc.player, villager, Hand.MAIN_HAND);
                 if (Debug.get()) info("Action wasn't accepted");
             }
+        }
+    }
+
+    private void cancelPlayerMovementControl() {
+        if (mc.player == null || mc.player.input == null) return;
+
+        int ticksRemaining = ticks_to_wait.get() - ticker;
+        if (ticksRemaining < 0 || ticksRemaining > ticks_to_cancel_movement.get()) return;
+
+        if (mc.player != null) {
+            mc.player.setSprinting(false);
+            mc.player.setSneaking(false);
+            mc.player.input.jump();
+        }
+
+        if (mc.options != null) {
+            mc.options.forwardKey.setPressed(false);
+            mc.options.backKey.setPressed(false);
+            mc.options.leftKey.setPressed(false);
+            mc.options.rightKey.setPressed(false);
+            mc.options.jumpKey.setPressed(false);
+            mc.options.sneakKey.setPressed(false);
         }
     }
 
@@ -847,11 +708,11 @@ public class TradeAura extends Module {
             boolean sellLimitOk = rule.value2 == -1 || countItemInInventory(Items.EMERALD) < rule.value2;
             
             for (Item item : rule.items) {
-                if (!VILLAGER_BUYS.containsKey(item)) {
+                if (!TradeData.VILLAGER_BUYS.containsKey(item)) {
                     anyValidTrade = true; // Unhardcoded item, allow click to check
                     break;
                 }
-                boolean correctProfession = VILLAGER_BUYS.get(item).contains(professionName) || professionName == "any";
+                boolean correctProfession = TradeData.VILLAGER_BUYS.get(item).contains(professionName) || professionName.equals("any");
                 
                 if (correctProfession && sellLimitOk) {
                     anyValidTrade = true; // Found a valid trade!
@@ -866,11 +727,11 @@ public class TradeAura extends Module {
         // 2. Check BUY rules (we buy from the villager)
         for (TradeRule rule : buyRules) {
             for (Item item : rule.items) {
-                if (!VILLAGER_SELLS.containsKey(item)) {
+                if (!TradeData.VILLAGER_SELLS.containsKey(item)) {
                     anyValidTrade = true;
                     break;
                 }
-                boolean correctProfession = VILLAGER_SELLS.get(item).contains(professionName) || professionName == "any";
+                boolean correctProfession = TradeData.VILLAGER_SELLS.get(item).contains(professionName) || professionName.equals("any");
                 boolean buyLimitOk = rule.value2 == -1 || countItemInInventory(item) < rule.value2;
                 
                 if (correctProfession && buyLimitOk) {
@@ -888,7 +749,12 @@ public class TradeAura extends Module {
     private void onTick(TickEvent.Pre event) {
         if (!mc.player.isAlive() || PlayerUtils.getGameMode() == GameMode.SPECTATOR) return;
 
-        if (++ticker < ticks_to_wait.get()) return;
+        if (++ticker < ticks_to_wait.get()) {
+            if (aura.get() && cancelMovement.get()) {
+                cancelPlayerMovementControl();
+            }
+            return;
+        }
         ticker = 0;
 
         if (mc.player.currentScreenHandler instanceof MerchantScreenHandler) {
@@ -917,7 +783,15 @@ public class TradeAura extends Module {
 
                 remember_entity = targett;
                 VillagerCooldown.put(targett, new Pair<>(0, defaultColor.get()));
-                VillagerInteract(targett);
+                if (rotateToVillager.get()) {
+                    VillagerInteract(targett);
+                } else {
+                    if (Debug.get()) info("Rotation disabled, interacting without rotating.");
+                    ActionResult actionResult = mc.interactionManager.interactEntity(mc.player, targett, Hand.MAIN_HAND);
+                    if (!actionResult.isAccepted() && Debug.get()) {
+                        info("Aura interaction was not accepted.");
+                    }
+                }
                 break;
             }
         }
