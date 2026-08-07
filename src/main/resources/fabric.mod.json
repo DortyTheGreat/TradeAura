@@ -14,7 +14,7 @@
   "environment": "client",
   "entrypoints": {
     "meteor": [
-      "com.TradeAura.addon.Addon"
+      "${mod_package}.Addon"
     ]
   },
   "mixins": [
