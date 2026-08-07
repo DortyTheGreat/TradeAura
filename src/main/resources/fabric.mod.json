@@ -1,14 +1,14 @@
 {
   "schemaVersion": 1,
-  "id": "trade-aura",
+  "id": "${mod_id}",
   "version": "${version}",
-  "name": "TradeAura",
-  "description": "Meteor Addon for villager trading automatization",
+  "name": "${mod_name}",
+  "description": "${mod_description}",
   "authors": [
-    "Dorty"
+    "${mod_author}"
   ],
   "contact": {
-    "repo": "https://github.com/MeteorDevelopment/meteor-addon-template"
+    "repo": "${mod_repo}"
   },
   "icon": "assets/template/icon.png",
   "environment": "client",
@@ -20,7 +20,7 @@
   "mixins": [
   ],
   "custom": {
-    "meteor-client:color": "225,25,25"
+    "meteor-client:color": "${mod_color}"
   },
   "depends": {
     "java": ">=${jdk_version}",

@@ -1,11 +1,15 @@
 plugins {
-    alias(libs.plugins.fabric.loom)
+    // 26.1 is unobfuscated: this is the new, non-remapping loom plugin.
+    // The version lives in gradle.properties and is applied in settings.gradle.kts.
+    id("net.fabricmc.fabric-loom")
 }
 
+fun prop(key: String) = properties[key] as String
+
 base {
-    archivesName = properties["archives_base_name"] as String
-    version = libs.versions.mod.version.get()
-    group = properties["maven_group"] as String
+    archivesName = prop("mod_name")
+    version = prop("mod_version")
+    group = prop("maven_group")
 }
 
 repositories {
@@ -21,35 +25,33 @@ repositories {
 
 dependencies {
     // Fabric
-    // 26.1 is unobfuscated: no mappings, and no modImplementation / remapJar anymore.
-    minecraft(libs.minecraft)
-    implementation(libs.fabric.loader)
+    // No mappings dependency anymore, and no modImplementation / remapJar either: nothing gets remapped.
+    minecraft("com.mojang:minecraft:${prop("minecraft_version")}")
+    implementation("net.fabricmc:fabric-loader:${prop("loader_version")}")
 
     // Meteor
-    implementation(libs.meteor.client)
+    implementation("meteordevelopment:meteor-client:${prop("meteor_version")}")
 }
 
 java {
     toolchain {
-        languageVersion.set(JavaLanguageVersion.of(libs.versions.jdk.get().toInt()))
+        languageVersion.set(JavaLanguageVersion.of(prop("jdk_version").toInt()))
     }
-}
-
-fun toMinecraftCompat(version: String): String {
-    val match = Regex("""^(\d{2})\.([1-9]\d*)(?:\.([1-9]\d*))?$""")
-        .matchEntire(version)
-        ?: error("Invalid Minecraft version format: $version. Expected YY.D or YY.D.H")
-
-    val (year, drop, _) = match.destructured
-    return "$year.$drop"
 }
 
 tasks {
     processResources {
+        // Everything fabric.mod.json needs, straight out of gradle.properties.
         val propertyMap = mapOf(
-            "version" to project.version,
-            "minecraft_version" to toMinecraftCompat(libs.versions.minecraft.get()),
-            "jdk_version" to libs.versions.jdk.get(),
+            "mod_id" to prop("mod_id"),
+            "mod_name" to prop("mod_name"),
+            "mod_description" to prop("mod_description"),
+            "mod_author" to prop("mod_author"),
+            "mod_repo" to prop("mod_repo"),
+            "mod_color" to prop("mod_color"),
+            "version" to prop("mod_version"),
+            "minecraft_version" to prop("minecraft_version"),
+            "jdk_version" to prop("jdk_version"),
         )
 
         inputs.properties(propertyMap)
@@ -68,11 +70,5 @@ tasks {
 
     withType<JavaCompile>().configureEach {
         options.encoding = "UTF-8"
-        options.compilerArgs.addAll(
-            listOf(
-                "-Xlint:deprecation",
-                "-Xlint:unchecked"
-            )
-        )
     }
 }
