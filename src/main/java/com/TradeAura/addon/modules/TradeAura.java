@@ -1,6 +1,7 @@
 package com.TradeAura.addon.modules;
 
 import com.TradeAura.addon.inventory.InvHelper;
+import com.TradeAura.addon.inventory.MovementControl;
 import com.TradeAura.addon.inventory.InventoryManager;
 import com.TradeAura.addon.inventory.InventorySettings;
 import com.TradeAura.addon.inventory.ItemRule;
@@ -396,7 +397,7 @@ public class TradeAura extends Module {
 
     private final Setting<Boolean> cancelMovement = sgAura.add(new BoolSetting.Builder()
             .name("Cancel-Movement")
-            .description("Cancel player movement input when the next aura interaction is close")
+            .description("Block your movement input while a villager the aura can click is in range. Never triggers when there is nothing to trade with.")
             .defaultValue(false)
             .visible(aura::get)
             .build()
@@ -404,7 +405,7 @@ public class TradeAura extends Module {
 
     private final Setting<Integer> ticks_to_cancel_movement = sgAura.add(new IntSetting.Builder()
             .name("Ticks-to-cancel-movement")
-            .description("Cancel movement when fewer than this many ticks remain until the next aura interaction")
+            .description("Block movement when fewer than this many ticks remain until the next interaction. If this is not clearly below Ticks-to-wait, every tick falls into the window and movement is blocked the whole time a villager is in range.")
             .defaultValue(2)
             .min(0)
             .sliderMax(20)
@@ -414,7 +415,7 @@ public class TradeAura extends Module {
 
     private final Setting<Boolean> cancelMovementNearVillager = sgAura.add(new BoolSetting.Builder()
             .name("Cancel-movement-near-villager")
-            .description("Also cancel movement whenever a villager the aura could click is in range, not only shortly before the next interaction. Keeps you from walking out of range mid trading.")
+            .description("Block movement the entire time a villager is in range instead of only inside the countdown window above. Keeps you from walking out of range mid trading.")
             .defaultValue(false)
             .visible(() -> aura.get() && cancelMovement.get())
             .build()
@@ -621,6 +622,7 @@ public class TradeAura extends Module {
         pendingClose = false;
 
         invManager.reset();
+        MovementControl.stop();
     }
 
     @EventHandler
@@ -862,28 +864,29 @@ public class TradeAura extends Module {
         return false;
     }
 
-    private void cancelPlayerMovementControl() {
-        if (mc.player == null) return;
+    /**
+     * Decides every tick whether the player is allowed to move.
+     * <p>
+     * The lock only ever engages while there is a villager the aura would actually click - freezing the player
+     * in an empty field is never useful. On top of that either the countdown window
+     * ({@code Ticks-to-cancel-movement}) or {@code Cancel-movement-near-villager} has to ask for it.
+     */
+    private void updateMovementLock() {
+        if (mc.player == null || !aura.get() || !cancelMovement.get()) {
+            MovementControl.stop();
+            return;
+        }
+
+        if (!hasClickableVillager()) {
+            MovementControl.stop();
+            return;
+        }
 
         int ticksRemaining = ticks_to_wait.get() - ticker;
         boolean interactionClose = ticksRemaining >= 0 && ticksRemaining <= ticks_to_cancel_movement.get();
-        boolean villagerInRange = cancelMovementNearVillager.get() && hasClickableVillager();
 
-        if (!interactionClose && !villagerInRange) return;
-
-        if (mc.player != null) {
-            mc.player.setSprinting(false);
-            mc.player.setShiftKeyDown(false);
-        }
-
-        if (mc.options != null) {
-            mc.options.keyUp.setDown(false);
-            mc.options.keyDown.setDown(false);
-            mc.options.keyLeft.setDown(false);
-            mc.options.keyRight.setDown(false);
-            mc.options.keyJump.setDown(false);
-            mc.options.keyShift.setDown(false);
-        }
+        if (cancelMovementNearVillager.get() || interactionClose) MovementControl.freeze();
+        else MovementControl.stop();
     }
 
     // NEW METHOD: Pre-check whether to click the villager
@@ -976,8 +979,8 @@ public class TradeAura extends Module {
 
         ticker++;
 
-        // Called on every tick now: the villager based lock has nothing to do with the countdown.
-        if (aura.get() && cancelMovement.get()) cancelPlayerMovementControl();
+        // Called on every tick: the lock has to be re-applied (and released) continuously.
+        updateMovementLock();
 
         if (ticker < ticks_to_wait.get()) return;
         ticker = 0;

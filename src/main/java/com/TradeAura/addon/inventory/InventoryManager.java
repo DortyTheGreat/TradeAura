@@ -74,6 +74,9 @@ public class InventoryManager {
 
         // Running action
         if (task != null) {
+            // Only the shulker task manages the movement lock, everything else must not inherit one.
+            if (!(task instanceof ShulkerTask)) MovementControl.stop();
+
             InvTask.Status status = task.tick();
             if (status == InvTask.Status.RUNNING) return true;
 

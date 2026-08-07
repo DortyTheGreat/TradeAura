@@ -1,5 +1,7 @@
 package com.TradeAura.addon.inventory;
 
+import meteordevelopment.meteorclient.utils.misc.input.Input;
+
 import static meteordevelopment.meteorclient.MeteorClient.mc;
 
 /**
@@ -26,6 +28,7 @@ public final class MovementControl {
      * because a key binding is re-read by the client on every tick.
      */
     public static void freeze() {
+        holding = true;
         releaseKeys();
 
         if (mc.player != null) {
@@ -75,12 +78,29 @@ public final class MovementControl {
         if (mc.player.horizontalCollision && mc.player.onGround()) mc.options.keyJump.setDown(true);
     }
 
-    /** Releases everything this class pressed. Safe to call at any time. */
+    /**
+     * Hands control back to the player. Safe to call at any time.
+     * <p>
+     * The key bindings are restored to what the keyboard actually says instead of just being cleared: a key
+     * binding that is forced to "up" while the key is physically held stays up until the next key event, which
+     * is why the player had to let go and press again after the module released them.
+     */
     public static void stop() {
         if (!holding) return;
-
-        releaseKeys();
         holding = false;
+
+        if (mc.options == null) return;
+
+        restore(mc.options.keyUp);
+        restore(mc.options.keyDown);
+        restore(mc.options.keyLeft);
+        restore(mc.options.keyRight);
+        restore(mc.options.keyJump);
+        restore(mc.options.keyShift);
+    }
+
+    private static void restore(net.minecraft.client.KeyMapping key) {
+        key.setDown(Input.isPressed(key));
     }
 
     private static void releaseKeys() {
