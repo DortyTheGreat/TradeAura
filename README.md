@@ -4,13 +4,18 @@ Meteor addon that automates villager trading. Includes manual auto trade (trade 
 
 ### Download
 
-1.21.11 download in awailable in [Releases](https://github.com/DortyTheGreat/TradeAura/releases/latest)
+- [26.1.2](https://github.com/DortyTheGreat/TradeAura/releases/latest)
+- [1.21.11](https://github.com/DortyTheGreat/TradeAura/releases/tag/1.21.11d)
+- [1.21.4](https://github.com/DortyTheGreat/TradeAura/releases/tag/1.21.4d)
+
+> Note that only the latest Minecraft version receives updates, so earlier releases might lack some features
 
 ### Dependencies
 
 Tested successfully with these mods, but other might work as well
 
-- meteor-client-1.21.11-63.jar
+- meteor-client-26.1.2-41.jar (26.1.2)
+- meteor-client-1.21.11-63.jar (1.21.11)
 
 ### Usage
 
