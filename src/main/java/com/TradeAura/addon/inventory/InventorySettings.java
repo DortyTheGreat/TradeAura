@@ -73,6 +73,7 @@ public class InventorySettings {
     public Setting<Integer> shulkerPickupTicks;
     public Setting<Integer> transferBatch;
     public Setting<Boolean> walkToDrop;
+    public Setting<Boolean> lockMovement;
 
     public InventorySettings(SettingGroup group, Runnable onVisibilityChanged) {
         this.group = group;
@@ -324,6 +325,14 @@ public class InventorySettings {
             .defaultValue(12)
             .min(1)
             .sliderRange(1, 36)
+            .visible(() -> enabled.get() && (dumpEnabled.get() || refillEnabled.get()))
+            .build()
+        );
+
+        lockMovement = group.add(new BoolSetting.Builder()
+            .name("Lock-movement-while-placed")
+            .description("Suppress your own movement input from the moment the shulker box is placed until it is broken again. Only the input is blocked, movement packets keep being sent, so nothing desyncs.")
+            .defaultValue(true)
             .visible(() -> enabled.get() && (dumpEnabled.get() || refillEnabled.get()))
             .build()
         );

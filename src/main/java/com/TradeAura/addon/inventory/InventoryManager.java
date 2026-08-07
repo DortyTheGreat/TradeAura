@@ -129,6 +129,9 @@ public class InventoryManager {
             task = null;
         }
 
+        // Never leave a movement key held down because the module got switched off mid action.
+        MovementControl.stop();
+
         cooldowns.clear();
         delay = 0;
         chain = 0;

@@ -413,6 +413,14 @@ public class TradeAura extends Module {
             .build()
     );
 
+    private final Setting<Boolean> cancelMovementNearVillager = sgAura.add(new BoolSetting.Builder()
+            .name("Cancel-movement-near-villager")
+            .description("Also cancel movement whenever a villager the aura could click is in range, not only shortly before the next interaction. Keeps you from walking out of range mid trading.")
+            .defaultValue(false)
+            .visible(() -> aura.get() && cancelMovement.get())
+            .build()
+    );
+
     private final Setting<SortPriority> priority = sgAura.add(new EnumSetting.Builder<SortPriority>()
             .name("priority")
             .description("How to filter villagers within range.")
@@ -569,6 +577,8 @@ public class TradeAura extends Module {
     private final Map<Entity, Pair<Integer, Color>> VillagerCooldown = new HashMap<>();
     /** How often an unsynced villager has been retried in a row, see 'Refresh-unsynced-cooldown'. */
     private final Map<Entity, Integer> refreshCount = new HashMap<>();
+    /** Scratch list for the movement check, so no list is allocated every tick. */
+    private final List<Entity> movementCheckTargets = new ArrayList<>();
 
     private int ticker = 0;
     private int ticker_close = 0;
@@ -829,11 +839,29 @@ public class TradeAura extends Module {
         }
     }
 
+    /** Is there a villager in range that the aura would interact with right now? */
+    private boolean hasClickableVillager() {
+        movementCheckTargets.clear();
+        TargetUtils.getList(movementCheckTargets, this::entityCheck, priority.get(), maxTargets.get());
+
+        for (Entity target : movementCheckTargets) {
+            if (VillagerCooldown.containsKey(target)) continue;
+            if (shouldSkipVillager(target)) continue;
+
+            return true;
+        }
+
+        return false;
+    }
+
     private void cancelPlayerMovementControl() {
         if (mc.player == null || mc.player.input == null) return;
 
         int ticksRemaining = ticks_to_wait.get() - ticker;
-        if (ticksRemaining < 0 || ticksRemaining > ticks_to_cancel_movement.get()) return;
+        boolean interactionClose = ticksRemaining >= 0 && ticksRemaining <= ticks_to_cancel_movement.get();
+        boolean villagerInRange = cancelMovementNearVillager.get() && hasClickableVillager();
+
+        if (!interactionClose && !villagerInRange) return;
 
         if (mc.player != null) {
             mc.player.setSprinting(false);
@@ -939,12 +967,12 @@ public class TradeAura extends Module {
             return;
         }
 
-        if (++ticker < ticks_to_wait.get()) {
-            if (aura.get() && cancelMovement.get()) {
-                cancelPlayerMovementControl();
-            }
-            return;
-        }
+        ticker++;
+
+        // Called on every tick now: the villager based lock has nothing to do with the countdown.
+        if (aura.get() && cancelMovement.get()) cancelPlayerMovementControl();
+
+        if (ticker < ticks_to_wait.get()) return;
         ticker = 0;
 
         if (mc.player.currentScreenHandler instanceof MerchantScreenHandler) {

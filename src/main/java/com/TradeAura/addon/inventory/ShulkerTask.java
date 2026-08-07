@@ -97,6 +97,9 @@ public class ShulkerTask extends InvTask {
     protected Status run() {
         if (mc.player == null || mc.world == null) return fail("no player");
 
+        // Has to happen before the delay check, a key binding has to be re-suppressed on every single tick.
+        applyMovementControl();
+
         if (delay > 0) {
             delay--;
             return Status.RUNNING;
@@ -115,6 +118,24 @@ public class ShulkerTask extends InvTask {
             case Restore -> restore();
             case Done -> finish();
         };
+    }
+
+    /**
+     * While the box is standing in the world the player must not wander off, or the box ends up out of reach
+     * with all the items still inside. Only the input is blocked - movement packets are untouched, so the
+     * server keeps seeing the player normally.
+     * <p>
+     * The one exception is walking to the drop: there the module wants the player to move, so the lock is
+     * lifted and {@link MovementControl#walkTowards(double, double)} takes over.
+     */
+    private void applyMovementControl() {
+        boolean boxIsDown = switch (state) {
+            case Place, WaitPlaced, Open, WaitScreen, Transfer, Close, Break -> true;
+            default -> false;
+        };
+
+        if (boxIsDown && s.lockMovement.get()) MovementControl.freeze();
+        else if (state != State.Collect) MovementControl.stop();
     }
 
     // States
@@ -364,11 +385,13 @@ public class ShulkerTask extends InvTask {
 
     private Status collect() {
         if (countShulkers() >= shulkersBefore) {
+            MovementControl.stop();
             setState(State.Restore);
             return Status.RUNNING;
         }
 
         if (stateTicks >= s.shulkerPickupTicks.get()) {
+            MovementControl.stop();
             mgr.warn("The broken shulker box was not picked up, it is lying at " + pos.toShortString() + ".");
             setState(State.Restore);
             return Status.RUNNING;
@@ -404,25 +427,24 @@ public class ShulkerTask extends InvTask {
 
     private void walkToDrop() {
         ItemEntity drop = findDrop();
-        if (drop == null) return;
+
+        if (drop == null) {
+            MovementControl.stop();
+            return;
+        }
 
         double dx = drop.getX() - mc.player.getX();
         double dz = drop.getZ() - mc.player.getZ();
-        double distance = Math.sqrt(dx * dx + dz * dz);
 
-        if (distance < 0.35) return;
+        if (Math.sqrt(dx * dx + dz * dz) < 0.35) {
+            MovementControl.stop();
+            return;
+        }
 
-        // Entity#getPos() does not exist anymore in 1.21.11, the Entity overloads of Rotations do the same.
-        if (s.rotate.get()) Rotations.rotate(Rotations.getYaw(drop), Rotations.getPitch(drop), 50);
-
-        // Normal walking speed, never overshooting the target.
-        double speed = Math.min(0.2, distance);
-        Vec3d velocity = mc.player.getVelocity();
-
-        double y = velocity.y;
-        if (mc.player.horizontalCollision && mc.player.isOnGround()) y = 0.42;
-
-        mc.player.setVelocity(dx / distance * speed, y, dz / distance * speed);
+        // Real walking through the movement keys instead of a velocity injection: setting the velocity before
+        // the player tick fights with friction and with the empty movement input, which is why the player
+        // barely moved before.
+        MovementControl.walkTowards(drop.getX(), drop.getZ());
     }
 
     private Status restore() {
@@ -589,6 +611,8 @@ public class ShulkerTask extends InvTask {
 
     @Override
     public void cleanup() {
+        MovementControl.stop();
+
         if (mc.player == null) return;
 
         InvHelper.returnCursor(-1);
