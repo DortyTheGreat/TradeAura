@@ -2,22 +2,20 @@
 
 Meteor addon that automates villager trading. Includes manual auto trade (trade is completed automatically after a manual interaction with villager) and villager-aura (autamatically clicks at villagers to perform trades)
 
-### Download
+## Download
 
-- [26.1.2](https://github.com/DortyTheGreat/TradeAura/releases/latest)
-- [1.21.11](https://github.com/DortyTheGreat/TradeAura/releases/tag/1.21.11d)
-- [1.21.4](https://github.com/DortyTheGreat/TradeAura/releases/tag/1.21.4d)
+| Minecraft Version | TradeAura Download                                                            | Compatible Meteor Client       |
+| ----------------- | ----------------------------------------------------------------------------- | ------------------------------ |
+| 26.1.2+           | [26.1.2 (Latest)](https://github.com/DortyTheGreat/TradeAura/releases/latest) | `meteor-client-26.1.2-41.jar`  |
+| 1.21.11+          | [1.21.11](https://github.com/DortyTheGreat/TradeAura/releases/tag/1.21.11d)   | `meteor-client-1.21.11-63.jar` |
+| 1.21.4+           | [1.21.4](https://github.com/DortyTheGreat/TradeAura/releases/tag/1.21.4d)     | `meteor-client-1.21.4-18.jar`  |
 
-> Note that only the latest Minecraft version receives updates, so earlier releases might lack some features
+> **Notes:**
+>
+> * Only the latest Minecraft version receives feature updates. Older releases may not include the newest features.
+> * Releases are generally **forward-compatible**, meaning each Addon version is expected to work on multiple newer Minecraft versions. However, this compatibility is not guaranteed indefinitely and may eventually break.
 
-### Dependencies
-
-Tested successfully with these mods, but other might work as well
-
-- meteor-client-26.1.2-41.jar (26.1.2)
-- meteor-client-1.21.11-63.jar (1.21.11)
-
-### Usage
+## Usage
 
 - Choose items that you want to buy/sell. Each 'group' supports multiple items and has rules for limiting price/quantity of the deal. You can also configure limits for trades
     - Click on villagers, trades will be proceeded automatically without manually clicking on desired trades.
@@ -33,7 +31,7 @@ Tested successfully with these mods, but other might work as well
 - Toggle "Villager Aura" to automatically interact with villagers in your visual range
     - Toggle "Render" to see result of automatic villager interactions
 
-### Showcase
+## Showcase
 
 https://github.com/user-attachments/assets/7e2bc3a1-4222-4728-956b-aa308c9296ab
  
