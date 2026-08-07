@@ -1,18 +1,11 @@
 package com.TradeAura.addon.modules;
 
-import net.minecraft.item.Item;
-import net.minecraft.item.Items;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.Items;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
-
-/**
- * This code is somewht redundant, because
- * 1. This is useful for optimising a setting that pretty much noone cares about (limit)
- * 2. In order to use that list code should be able to access the villager proffesion,
- * which is not possible in the current state of the code.
- */
 
 public final class TradeData {
     public static final Map<Item, Set<String>> VILLAGER_BUYS = createBuyMap();

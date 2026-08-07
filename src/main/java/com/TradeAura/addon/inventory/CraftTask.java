@@ -3,16 +3,16 @@ package com.TradeAura.addon.inventory;
 import meteordevelopment.meteorclient.utils.player.PlayerUtils;
 import meteordevelopment.meteorclient.utils.player.Rotations;
 import meteordevelopment.meteorclient.utils.player.SlotUtils;
-import net.minecraft.block.Blocks;
-import net.minecraft.item.Item;
-import net.minecraft.screen.CraftingScreenHandler;
-import net.minecraft.screen.slot.SlotActionType;
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.Hand;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.inventory.CraftingMenu;
+import net.minecraft.world.inventory.ContainerInput;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.phys.Vec3;
 
 import static meteordevelopment.meteorclient.MeteorClient.mc;
 
@@ -61,7 +61,7 @@ public class CraftTask extends InvTask {
 
     @Override
     protected Status run() {
-        if (mc.player == null || mc.world == null) return fail("no player");
+        if (mc.player == null || mc.level == null) return fail("no player");
         if (crafts <= 0) return fail("nothing to craft");
 
         if (delay > 0) {
@@ -83,8 +83,8 @@ public class CraftTask extends InvTask {
     private Status init() {
         if (!recipe.needsTable()) {
             // 2x2 grid of the player screen handler, no table needed - but no other screen may be open.
-            if (mc.player.currentScreenHandler != mc.player.playerScreenHandler) {
-                mc.player.closeHandledScreen();
+            if (mc.player.containerMenu != mc.player.inventoryMenu) {
+                InvHelper.closeScreen();
                 return timedOut() ? fail("could not close the open screen") : Status.RUNNING;
             }
 
@@ -92,13 +92,13 @@ public class CraftTask extends InvTask {
             return Status.RUNNING;
         }
 
-        if (mc.player.currentScreenHandler instanceof CraftingScreenHandler) {
+        if (mc.player.containerMenu instanceof CraftingMenu) {
             setState(State.Fill);
             return Status.RUNNING;
         }
 
-        if (mc.player.currentScreenHandler != mc.player.playerScreenHandler) {
-            mc.player.closeHandledScreen();
+        if (mc.player.containerMenu != mc.player.inventoryMenu) {
+            InvHelper.closeScreen();
             return timedOut() ? fail("could not close the open screen") : Status.RUNNING;
         }
 
@@ -111,14 +111,14 @@ public class CraftTask extends InvTask {
 
     private Status openTable() {
         if (tablePos == null) return fail("no crafting table in range");
-        if (!mc.world.getBlockState(tablePos).isOf(Blocks.CRAFTING_TABLE)) return fail("crafting table vanished");
+        if (!mc.level.getBlockState(tablePos).is(Blocks.CRAFTING_TABLE)) return fail("crafting table vanished");
 
-        Vec3d hitPos = Vec3d.ofCenter(tablePos);
+        Vec3 hitPos = Vec3.atCenterOf(tablePos);
         BlockHitResult hitResult = new BlockHitResult(hitPos, Direction.UP, tablePos, false);
 
         Runnable interact = () -> {
-            ActionResult result = mc.interactionManager.interactBlock(mc.player, Hand.MAIN_HAND, hitResult);
-            if (result.isAccepted()) mc.player.swingHand(Hand.MAIN_HAND);
+            InteractionResult result = mc.gameMode.useItemOn(mc.player, InteractionHand.MAIN_HAND, hitResult);
+            if (result.consumesAction()) mc.player.swing(InteractionHand.MAIN_HAND);
         };
 
         if (s.rotate.get()) Rotations.rotate(Rotations.getYaw(hitPos), Rotations.getPitch(hitPos), 100, interact);
@@ -129,7 +129,7 @@ public class CraftTask extends InvTask {
     }
 
     private Status waitScreen() {
-        if (mc.player.currentScreenHandler instanceof CraftingScreenHandler) {
+        if (mc.player.containerMenu instanceof CraftingMenu) {
             setState(State.Fill);
             return Status.RUNNING;
         }
@@ -156,7 +156,7 @@ public class CraftTask extends InvTask {
             if (used > 0 && used >= budget) break;
 
             int clicks = fillGridSlot(slotId, recipe.input(), crafts);
-            if (clicks < 0) return fail("ran out of " + recipe.input().getName().getString());
+            if (clicks < 0) return fail("ran out of " + name(recipe.input()));
 
             used += clicks;
             gridIndex++;
@@ -174,7 +174,7 @@ public class CraftTask extends InvTask {
         if (!handlerValid()) return fail("screen closed before taking the result");
 
         // Every used grid slot holds exactly `crafts` ingredients, so one shift click crafts exactly `crafts` times.
-        InvHelper.click(0, 0, SlotActionType.QUICK_MOVE);
+        InvHelper.click(0, 0, ContainerInput.QUICK_MOVE);
 
         setState(State.Verify);
         delay = Math.max(1, s.actionDelay.get());
@@ -192,7 +192,7 @@ public class CraftTask extends InvTask {
             return Status.RUNNING;
         }
 
-        debug(recipe.id() + ": crafted " + crafts + "x " + recipe.output().getName().getString());
+        debug(recipe.id() + ": crafted " + crafts + "x " + name(recipe.output()));
         setState(State.Done);
         return Status.DONE;
     }
@@ -215,7 +215,7 @@ public class CraftTask extends InvTask {
             if (fromId == -1) break;
 
             int wanted = need - have;
-            int available = mc.player.getInventory().getStack(index).getCount();
+            int available = mc.player.getInventory().getItem(index).getCount();
 
             int moved = InvHelper.moveExact(fromId, slotId, wanted);
             if (moved <= 0) break;
@@ -235,7 +235,7 @@ public class CraftTask extends InvTask {
         for (int i = 1; i <= recipe.gridSize(); i++) {
             if (InvHelper.stackInSlotId(i).isEmpty()) continue;
 
-            InvHelper.click(i, 0, SlotActionType.QUICK_MOVE);
+            InvHelper.click(i, 0, ContainerInput.QUICK_MOVE);
             leftovers = true;
         }
 
@@ -243,25 +243,25 @@ public class CraftTask extends InvTask {
     }
 
     private boolean handlerValid() {
-        if (recipe.needsTable()) return mc.player.currentScreenHandler instanceof CraftingScreenHandler;
-        return mc.player.currentScreenHandler == mc.player.playerScreenHandler;
+        if (recipe.needsTable()) return mc.player.containerMenu instanceof CraftingMenu;
+        return mc.player.containerMenu == mc.player.inventoryMenu;
     }
 
     /** Nearest crafting table within range, {@code null} when there is none - the trigger then does not fire. */
     public static BlockPos findCraftingTable(double range) {
-        if (mc.player == null || mc.world == null) return null;
+        if (mc.player == null || mc.level == null) return null;
 
         BlockPos best = null;
         double bestDistance = Double.MAX_VALUE;
 
         int r = (int) Math.ceil(range) + 1;
-        BlockPos center = mc.player.getBlockPos();
+        BlockPos center = mc.player.blockPosition();
 
         for (int x = -r; x <= r; x++) {
             for (int y = -r; y <= r; y++) {
                 for (int z = -r; z <= r; z++) {
-                    BlockPos pos = center.add(x, y, z);
-                    if (!mc.world.getBlockState(pos).isOf(Blocks.CRAFTING_TABLE)) continue;
+                    BlockPos pos = center.offset(x, y, z);
+                    if (!mc.level.getBlockState(pos).is(Blocks.CRAFTING_TABLE)) continue;
 
                     double distance = PlayerUtils.distanceTo(pos);
                     if (distance > range || distance >= bestDistance) continue;
@@ -273,6 +273,10 @@ public class CraftTask extends InvTask {
         }
 
         return best;
+    }
+
+    private static String name(Item item) {
+        return item.getDefaultInstance().getHoverName().getString();
     }
 
     private void setState(State state) {
@@ -291,6 +295,6 @@ public class CraftTask extends InvTask {
         if (handlerValid()) clearGrid();
 
         // The old implementation left the crafting screen open, this one always closes it again.
-        if (mc.player.currentScreenHandler instanceof CraftingScreenHandler) mc.player.closeHandledScreen();
+        if (mc.player.containerMenu instanceof CraftingMenu) InvHelper.closeScreen();
     }
 }

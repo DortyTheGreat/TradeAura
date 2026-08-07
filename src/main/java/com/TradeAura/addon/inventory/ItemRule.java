@@ -1,12 +1,12 @@
 package com.TradeAura.addon.inventory;
 
-import net.minecraft.item.Item;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.nbt.NbtElement;
-import net.minecraft.nbt.NbtList;
-import net.minecraft.nbt.NbtString;
-import net.minecraft.registry.Registries;
-import net.minecraft.util.Identifier;
+import net.minecraft.world.item.Item;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.Tag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.StringTag;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.Identifier;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -42,16 +42,16 @@ public class ItemRule {
 
     // NBT
 
-    public static NbtList listToTag(List<ItemRule> rules) {
-        NbtList list = new NbtList();
+    public static ListTag listToTag(List<ItemRule> rules) {
+        ListTag list = new ListTag();
 
         for (ItemRule rule : rules) {
-            NbtCompound ruleTag = new NbtCompound();
-            NbtList itemsList = new NbtList();
+            CompoundTag ruleTag = new CompoundTag();
+            ListTag itemsList = new ListTag();
 
             for (Item item : rule.items) {
-                Identifier id = Registries.ITEM.getId(item);
-                if (id != null) itemsList.add(NbtString.of(id.toString()));
+                Identifier id = BuiltInRegistries.ITEM.getKey(item);
+                if (id != null) itemsList.add(StringTag.valueOf(id.toString()));
             }
 
             ruleTag.put("items", itemsList);
@@ -63,27 +63,27 @@ public class ItemRule {
         return list;
     }
 
-    public static void listFromTag(NbtList list, List<ItemRule> rules) {
+    public static void listFromTag(ListTag list, List<ItemRule> rules) {
         rules.clear();
 
-        for (NbtElement element : list) {
-            if (!(element instanceof NbtCompound ruleTag)) continue;
+        for (Tag element : list) {
+            if (!(element instanceof CompoundTag ruleTag)) continue;
 
             ItemRule rule = new ItemRule();
 
-            if (ruleTag.get("items") instanceof NbtList itemsList) {
-                for (NbtElement itemElement : itemsList) {
-                    if (!(itemElement instanceof NbtString itemString)) continue;
+            if (ruleTag.get("items") instanceof ListTag itemsList) {
+                for (Tag itemElement : itemsList) {
+                    if (!(itemElement instanceof StringTag itemString)) continue;
 
                     itemString.asString().ifPresent(idStr -> {
                         Identifier id = Identifier.tryParse(idStr);
-                        if (id != null && Registries.ITEM.containsId(id)) rule.items.add(Registries.ITEM.get(id));
+                        if (id != null && BuiltInRegistries.ITEM.containsKey(id)) rule.items.add(BuiltInRegistries.ITEM.getValue(id));
                     });
                 }
             }
 
-            rule.trigger = ruleTag.getInt("trigger").orElse(64);
-            rule.leave = ruleTag.getInt("leave").orElse(32);
+            rule.trigger = ruleTag.getIntOr("trigger", 64);
+            rule.leave = ruleTag.getIntOr("leave", 32);
             rules.add(rule);
         }
     }

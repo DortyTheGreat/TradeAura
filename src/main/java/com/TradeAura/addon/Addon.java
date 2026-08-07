@@ -10,12 +10,12 @@ import meteordevelopment.meteorclient.systems.hud.HudGroup;
 import meteordevelopment.meteorclient.systems.modules.Category;
 import meteordevelopment.meteorclient.systems.modules.Modules;
 import com.TradeAura.addon.modules.*;
-import net.minecraft.item.Items;
+import net.minecraft.world.item.Items;
 import org.slf4j.Logger;
 
 public class Addon extends MeteorAddon {
     public static final Logger LOG = LogUtils.getLogger();
-    public static Category CATEGORY = new Category("DortyAddons", Items.DRIED_KELP.getDefaultStack());
+    public static Category CATEGORY = new Category("DortyAddons", () -> Items.DRIED_KELP.getDefaultInstance());
 	
 	
 	

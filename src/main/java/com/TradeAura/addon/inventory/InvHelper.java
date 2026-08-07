@@ -1,12 +1,14 @@
 package com.TradeAura.addon.inventory;
 
 import meteordevelopment.meteorclient.utils.Utils;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.network.protocol.game.ServerboundContainerClosePacket;
 import meteordevelopment.meteorclient.utils.player.SlotUtils;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.screen.ScreenHandler;
-import net.minecraft.screen.slot.Slot;
-import net.minecraft.screen.slot.SlotActionType;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.Slot;
+import net.minecraft.world.inventory.ContainerInput;
 
 import java.util.List;
 
@@ -34,8 +36,8 @@ public final class InvHelper {
 
         int count = 0;
         for (int i = SlotUtils.HOTBAR_START; i <= SlotUtils.MAIN_END; i++) {
-            ItemStack stack = mc.player.getInventory().getStack(i);
-            if (!stack.isEmpty() && stack.isOf(item)) count += stack.getCount();
+            ItemStack stack = mc.player.getInventory().getItem(i);
+            if (!stack.isEmpty() && stack.is(item)) count += stack.getCount();
         }
 
         return count;
@@ -46,7 +48,7 @@ public final class InvHelper {
 
         int count = 0;
         for (int i = SlotUtils.HOTBAR_START; i <= SlotUtils.MAIN_END; i++) {
-            ItemStack stack = mc.player.getInventory().getStack(i);
+            ItemStack stack = mc.player.getInventory().getItem(i);
             if (!stack.isEmpty() && items.contains(stack.getItem())) count += stack.getCount();
         }
 
@@ -64,7 +66,7 @@ public final class InvHelper {
         if (mc.player == null) return -1;
 
         for (int i = SlotUtils.HOTBAR_START; i <= SlotUtils.MAIN_END; i++) {
-            ItemStack stack = mc.player.getInventory().getStack(i);
+            ItemStack stack = mc.player.getInventory().getItem(i);
             if (!stack.isEmpty() && items.contains(stack.getItem())) return i;
         }
 
@@ -81,8 +83,8 @@ public final class InvHelper {
 
         int slot = -1, best = Integer.MAX_VALUE;
         for (int i = SlotUtils.HOTBAR_START; i <= SlotUtils.MAIN_END; i++) {
-            ItemStack stack = mc.player.getInventory().getStack(i);
-            if (stack.isEmpty() || !stack.isOf(item)) continue;
+            ItemStack stack = mc.player.getInventory().getItem(i);
+            if (stack.isEmpty() || !stack.is(item)) continue;
 
             if (stack.getCount() < best) {
                 best = stack.getCount();
@@ -97,7 +99,7 @@ public final class InvHelper {
         if (mc.player == null) return -1;
 
         for (int i = SlotUtils.HOTBAR_START; i <= SlotUtils.MAIN_END; i++) {
-            if (mc.player.getInventory().getStack(i).isEmpty()) return i;
+            if (mc.player.getInventory().getItem(i).isEmpty()) return i;
         }
 
         return -1;
@@ -107,7 +109,7 @@ public final class InvHelper {
         if (mc.player == null) return -1;
 
         for (int i = SlotUtils.HOTBAR_START; i <= SlotUtils.HOTBAR_END; i++) {
-            if (mc.player.getInventory().getStack(i).isEmpty()) return i;
+            if (mc.player.getInventory().getItem(i).isEmpty()) return i;
         }
 
         return -1;
@@ -121,8 +123,8 @@ public final class InvHelper {
         if (mc.player == null) return -1;
 
         for (int i = SlotUtils.HOTBAR_START; i <= SlotUtils.MAIN_END; i++) {
-            ItemStack stack = mc.player.getInventory().getStack(i);
-            if (!stack.isEmpty() && stack.isOf(item) && stack.getCount() < stack.getMaxCount()) return i;
+            ItemStack stack = mc.player.getInventory().getItem(i);
+            if (!stack.isEmpty() && stack.is(item) && stack.getCount() < stack.getMaxStackSize()) return i;
         }
 
         return findEmptyIndex();
@@ -132,14 +134,14 @@ public final class InvHelper {
     public static int freeSpaceFor(Item item) {
         if (mc.player == null) return 0;
 
-        int max = item.getDefaultStack().getMaxCount();
+        int max = item.getDefaultInstance().getMaxStackSize();
         int space = 0;
 
         for (int i = SlotUtils.HOTBAR_START; i <= SlotUtils.MAIN_END; i++) {
-            ItemStack stack = mc.player.getInventory().getStack(i);
+            ItemStack stack = mc.player.getInventory().getItem(i);
 
             if (stack.isEmpty()) space += max;
-            else if (stack.isOf(item)) space += Math.max(0, stack.getMaxCount() - stack.getCount());
+            else if (stack.is(item)) space += Math.max(0, stack.getMaxStackSize() - stack.getCount());
         }
 
         return space;
@@ -148,25 +150,25 @@ public final class InvHelper {
     // Clicking
 
     public static boolean isValidSlotId(int slotId) {
-        if (mc.player == null || mc.player.currentScreenHandler == null) return false;
-        return slotId >= 0 && slotId < mc.player.currentScreenHandler.slots.size();
+        if (mc.player == null || mc.player.containerMenu == null) return false;
+        return slotId >= 0 && slotId < mc.player.containerMenu.slots.size();
     }
 
     public static ItemStack stackInSlotId(int slotId) {
         if (!isValidSlotId(slotId)) return ItemStack.EMPTY;
-        return mc.player.currentScreenHandler.getSlot(slotId).getStack();
+        return mc.player.containerMenu.getSlot(slotId).getItem();
     }
 
-    public static void click(int slotId, int button, SlotActionType type) {
-        if (mc.player == null || mc.interactionManager == null) return;
+    public static void click(int slotId, int button, ContainerInput type) {
+        if (mc.player == null || mc.gameMode == null) return;
         if (!isValidSlotId(slotId)) return;
 
-        mc.interactionManager.clickSlot(mc.player.currentScreenHandler.syncId, slotId, button, type, mc.player);
+        mc.gameMode.handleContainerInput(mc.player.containerMenu.containerId, slotId, button, type, mc.player);
     }
 
     public static ItemStack cursor() {
-        if (mc.player == null || mc.player.currentScreenHandler == null) return ItemStack.EMPTY;
-        return mc.player.currentScreenHandler.getCursorStack();
+        if (mc.player == null || mc.player.containerMenu == null) return ItemStack.EMPTY;
+        return mc.player.containerMenu.getCarried();
     }
 
     /**
@@ -178,8 +180,8 @@ public final class InvHelper {
 
         if (isValidSlotId(preferredSlotId)) {
             ItemStack target = stackInSlotId(preferredSlotId);
-            if (target.isEmpty() || (target.isOf(cursor().getItem()) && target.getCount() < target.getMaxCount())) {
-                click(preferredSlotId, 0, SlotActionType.PICKUP);
+            if (target.isEmpty() || (target.is(cursor().getItem()) && target.getCount() < target.getMaxStackSize())) {
+                click(preferredSlotId, 0, ContainerInput.PICKUP);
                 if (cursor().isEmpty()) return;
             }
         }
@@ -187,7 +189,7 @@ public final class InvHelper {
         int index = findTargetIndex(cursor().getItem());
         if (index != -1) {
             int id = SlotUtils.indexToId(index);
-            if (id != -1) click(id, 0, SlotActionType.PICKUP);
+            if (id != -1) click(id, 0, ContainerInput.PICKUP);
         }
     }
 
@@ -209,26 +211,41 @@ public final class InvHelper {
         if (source.isEmpty()) return 0;
 
         ItemStack target = stackInSlotId(toSlotId);
-        if (!target.isEmpty() && !target.isOf(source.getItem())) return 0;
+        if (!target.isEmpty() && !target.is(source.getItem())) return 0;
 
-        int space = target.isEmpty() ? source.getMaxCount() : target.getMaxCount() - target.getCount();
+        int space = target.isEmpty() ? source.getMaxStackSize() : target.getMaxStackSize() - target.getCount();
         int move = Math.min(Math.min(amount, source.getCount()), space);
         if (move <= 0) return 0;
 
         boolean wholeStack = move == source.getCount();
 
-        click(fromSlotId, 0, SlotActionType.PICKUP);
+        click(fromSlotId, 0, ContainerInput.PICKUP);
         if (cursor().isEmpty()) return 0;
 
         if (wholeStack) {
-            click(toSlotId, 0, SlotActionType.PICKUP);
+            click(toSlotId, 0, ContainerInput.PICKUP);
         }
         else {
-            for (int i = 0; i < move; i++) click(toSlotId, 1, SlotActionType.PICKUP);
+            for (int i = 0; i < move; i++) click(toSlotId, 1, ContainerInput.PICKUP);
         }
 
         returnCursor(fromSlotId);
         return move;
+    }
+
+    /**
+     * Closes whatever container is currently open.
+     * <p>
+     * Done explicitly instead of through the player method so it also works when the screen itself was never
+     * shown (the module cancels those), and so it does not depend on a name that moved around in 26.1.
+     */
+    public static void closeScreen() {
+        if (mc.player == null || mc.player.containerMenu == mc.player.inventoryMenu) return;
+
+        mc.player.connection.send(new ServerboundContainerClosePacket(mc.player.containerMenu.containerId));
+        mc.player.containerMenu = mc.player.inventoryMenu;
+
+        if (mc.screen instanceof AbstractContainerScreen<?>) mc.setScreen(null);
     }
 
     // Shulker box items
@@ -257,12 +274,12 @@ public final class InvHelper {
 
     /** How many items of that type the shulker box item can still accept. */
     public static int containerSpaceFor(ItemStack shulker, Item item) {
-        int max = item.getDefaultStack().getMaxCount();
+        int max = item.getDefaultInstance().getMaxStackSize();
         int space = 0;
 
         for (ItemStack stack : readContainer(shulker)) {
             if (stack.isEmpty()) space += max;
-            else if (stack.isOf(item)) space += Math.max(0, stack.getMaxCount() - stack.getCount());
+            else if (stack.is(item)) space += Math.max(0, stack.getMaxStackSize() - stack.getCount());
         }
 
         return space;
@@ -277,26 +294,26 @@ public final class InvHelper {
     }
 
     /** Finds a slot inside an open container screen that can accept the item, container slots only. */
-    public static int findContainerTargetSlot(ScreenHandler handler, int containerSlots, Item item) {
+    public static int findContainerTargetSlot(AbstractContainerMenu handler, int containerSlots, Item item) {
         int empty = -1;
 
         for (int i = 0; i < containerSlots && i < handler.slots.size(); i++) {
             Slot slot = handler.getSlot(i);
-            ItemStack stack = slot.getStack();
+            ItemStack stack = slot.getItem();
 
             if (stack.isEmpty()) {
                 if (empty == -1) empty = i;
             }
-            else if (stack.isOf(item) && stack.getCount() < stack.getMaxCount()) return i;
+            else if (stack.is(item) && stack.getCount() < stack.getMaxStackSize()) return i;
         }
 
         return empty;
     }
 
     /** Finds a container slot holding one of the items. */
-    public static int findContainerSlotWith(ScreenHandler handler, int containerSlots, List<Item> items) {
+    public static int findContainerSlotWith(AbstractContainerMenu handler, int containerSlots, List<Item> items) {
         for (int i = 0; i < containerSlots && i < handler.slots.size(); i++) {
-            ItemStack stack = handler.getSlot(i).getStack();
+            ItemStack stack = handler.getSlot(i).getItem();
             if (!stack.isEmpty() && items.contains(stack.getItem())) return i;
         }
 

@@ -6,19 +6,20 @@ import meteordevelopment.meteorclient.utils.player.PlayerUtils;
 import meteordevelopment.meteorclient.utils.player.Rotations;
 import meteordevelopment.meteorclient.utils.player.SlotUtils;
 import meteordevelopment.meteorclient.utils.world.BlockUtils;
-import net.minecraft.block.Blocks;
-import net.minecraft.block.ShulkerBoxBlock;
-import net.minecraft.entity.ItemEntity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.screen.ShulkerBoxScreenHandler;
-import net.minecraft.screen.slot.SlotActionType;
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.Hand;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.ShulkerBoxBlock;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.inventory.ShulkerBoxMenu;
+import net.minecraft.world.inventory.ContainerInput;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.core.Direction;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.List;
 
@@ -95,7 +96,7 @@ public class ShulkerTask extends InvTask {
 
     @Override
     protected Status run() {
-        if (mc.player == null || mc.world == null) return fail("no player");
+        if (mc.player == null || mc.level == null) return fail("no player");
 
         // Has to happen before the delay check, a key binding has to be re-suppressed on every single tick.
         applyMovementControl();
@@ -141,8 +142,8 @@ public class ShulkerTask extends InvTask {
     // States
 
     private Status prepare() {
-        if (mc.player.currentScreenHandler != mc.player.playerScreenHandler) {
-            mc.player.closeHandledScreen();
+        if (mc.player.containerMenu != mc.player.inventoryMenu) {
+            InvHelper.closeScreen();
             return timedOut() ? fail("could not close the open screen") : Status.RUNNING;
         }
 
@@ -173,13 +174,13 @@ public class ShulkerTask extends InvTask {
     }
 
     private Status place() {
-        ItemStack stack = mc.player.getInventory().getStack(shulkerIndex);
+        ItemStack stack = mc.player.getInventory().getItem(shulkerIndex);
         if (!InvHelper.isShulker(stack)) return fail("the shulker box moved out of its slot");
 
         InvUtils.swap(shulkerIndex, true);
 
-        BlockPos support = pos.down();
-        Vec3d hitPos = Vec3d.ofCenter(support).add(0, 0.5, 0);
+        BlockPos support = pos.below();
+        Vec3 hitPos = Vec3.atCenterOf(support).add(0, 0.5, 0);
         BlockHitResult hitResult = new BlockHitResult(hitPos, Direction.UP, support, false);
 
         interact(hitResult, hitPos);
@@ -189,7 +190,7 @@ public class ShulkerTask extends InvTask {
     }
 
     private Status waitPlaced() {
-        if (mc.world.getBlockState(pos).getBlock() instanceof ShulkerBoxBlock) {
+        if (mc.level.getBlockState(pos).getBlock() instanceof ShulkerBoxBlock) {
             setState(State.Open);
             return Status.RUNNING;
         }
@@ -198,8 +199,8 @@ public class ShulkerTask extends InvTask {
 
         // Retry the placement every few ticks, the first attempt can be eaten by a lag spike.
         if (stateTicks % 10 == 0) {
-            BlockPos support = pos.down();
-            Vec3d hitPos = Vec3d.ofCenter(support).add(0, 0.5, 0);
+            BlockPos support = pos.below();
+            Vec3 hitPos = Vec3.atCenterOf(support).add(0, 0.5, 0);
             interact(new BlockHitResult(hitPos, Direction.UP, support, false), hitPos);
         }
 
@@ -207,7 +208,7 @@ public class ShulkerTask extends InvTask {
     }
 
     private Status open() {
-        Vec3d hitPos = Vec3d.ofCenter(pos);
+        Vec3 hitPos = Vec3.atCenterOf(pos);
         interact(new BlockHitResult(hitPos, Direction.UP, pos, false), hitPos);
 
         setState(State.WaitScreen);
@@ -215,7 +216,7 @@ public class ShulkerTask extends InvTask {
     }
 
     private Status waitScreen() {
-        if (mc.player.currentScreenHandler instanceof ShulkerBoxScreenHandler) {
+        if (mc.player.containerMenu instanceof ShulkerBoxMenu) {
             setState(State.Transfer);
             return Status.RUNNING;
         }
@@ -223,7 +224,7 @@ public class ShulkerTask extends InvTask {
         if (timedOut()) return failLater("the shulker box did not open");
 
         if (stateTicks % 10 == 0) {
-            Vec3d hitPos = Vec3d.ofCenter(pos);
+            Vec3 hitPos = Vec3.atCenterOf(pos);
             interact(new BlockHitResult(hitPos, Direction.UP, pos, false), hitPos);
         }
 
@@ -231,7 +232,7 @@ public class ShulkerTask extends InvTask {
     }
 
     private Status transfer() {
-        if (!(mc.player.currentScreenHandler instanceof ShulkerBoxScreenHandler)) {
+        if (!(mc.player.containerMenu instanceof ShulkerBoxMenu)) {
             return failLater("the shulker screen closed unexpectedly");
         }
 
@@ -279,7 +280,7 @@ public class ShulkerTask extends InvTask {
                 continue;
             }
 
-            ItemStack stack = mc.player.getInventory().getStack(index);
+            ItemStack stack = mc.player.getInventory().getItem(index);
             int fromId = SlotUtils.indexToId(index);
             if (fromId == -1) continue;
 
@@ -289,11 +290,11 @@ public class ShulkerTask extends InvTask {
             if (wanted >= stack.getCount()) {
                 // Whole stack: one shift click instead of a pickup / place pair.
                 int before = stack.getCount();
-                InvHelper.click(fromId, 0, SlotActionType.QUICK_MOVE);
-                moved = Math.max(0, before - mc.player.getInventory().getStack(index).getCount());
+                InvHelper.click(fromId, 0, ContainerInput.QUICK_MOVE);
+                moved = Math.max(0, before - mc.player.getInventory().getItem(index).getCount());
             }
             else {
-                int toId = InvHelper.findContainerTargetSlot(mc.player.currentScreenHandler, CONTAINER_SLOTS, stack.getItem());
+                int toId = InvHelper.findContainerTargetSlot(mc.player.containerMenu, CONTAINER_SLOTS, stack.getItem());
                 if (toId == -1) continue;
 
                 moved = InvHelper.moveExact(fromId, toId, wanted);
@@ -310,7 +311,7 @@ public class ShulkerTask extends InvTask {
         for (Entry entry : entries) {
             if (entry.remaining <= 0) continue;
 
-            int fromId = InvHelper.findContainerSlotWith(mc.player.currentScreenHandler, CONTAINER_SLOTS, entry.rule.items);
+            int fromId = InvHelper.findContainerSlotWith(mc.player.containerMenu, CONTAINER_SLOTS, entry.rule.items);
             if (fromId == -1) {
                 entry.remaining = 0;
                 continue;
@@ -322,7 +323,7 @@ public class ShulkerTask extends InvTask {
 
             if (wanted >= stack.getCount()) {
                 int before = stack.getCount();
-                InvHelper.click(fromId, 0, SlotActionType.QUICK_MOVE);
+                InvHelper.click(fromId, 0, ContainerInput.QUICK_MOVE);
                 moved = Math.max(0, before - InvHelper.stackInSlotId(fromId).getCount());
             }
             else {
@@ -351,7 +352,7 @@ public class ShulkerTask extends InvTask {
 
     private Status close() {
         InvHelper.returnCursor(-1);
-        mc.player.closeHandledScreen();
+        InvHelper.closeScreen();
 
         setState(State.Break);
         delay = Math.max(1, s.actionDelay.get());
@@ -359,7 +360,7 @@ public class ShulkerTask extends InvTask {
     }
 
     private Status breakBox() {
-        if (!(mc.world.getBlockState(pos).getBlock() instanceof ShulkerBoxBlock)) {
+        if (!(mc.level.getBlockState(pos).getBlock() instanceof ShulkerBoxBlock)) {
             setState(State.Collect);
             return Status.RUNNING;
         }
@@ -369,7 +370,7 @@ public class ShulkerTask extends InvTask {
         if (s.shulkerAutoTool.get() && !toolSwapped) {
             toolSwapped = true;
 
-            FindItemResult tool = InvUtils.findFastestTool(mc.world.getBlockState(pos));
+            FindItemResult tool = InvUtils.findFastestTool(mc.level.getBlockState(pos));
             if (tool.found() && tool.isHotbar()) InvUtils.swap(tool.slot(), true);
         }
 
@@ -406,7 +407,7 @@ public class ShulkerTask extends InvTask {
 
     /** Nearest dropped shulker box around the spot the box was broken at. */
     private ItemEntity findDrop() {
-        Box box = new Box(
+        AABB box = new AABB(
             pos.getX() - 6, pos.getY() - 4, pos.getZ() - 6,
             pos.getX() + 7, pos.getY() + 5, pos.getZ() + 7
         );
@@ -414,11 +415,13 @@ public class ShulkerTask extends InvTask {
         ItemEntity best = null;
         double bestDistance = Double.MAX_VALUE;
 
-        for (ItemEntity entity : mc.world.getEntitiesByClass(ItemEntity.class, box, e -> InvHelper.isShulker(e.getStack()))) {
-            double distance = mc.player.squaredDistanceTo(entity);
+        for (Entity entity : mc.level.getEntities(mc.player, box, e -> e instanceof ItemEntity item && InvHelper.isShulker(item.getItem()))) {
+            if (!(entity instanceof ItemEntity item)) continue;
+
+            double distance = mc.player.distanceToSqr(entity);
             if (distance >= bestDistance) continue;
 
-            best = entity;
+            best = item;
             bestDistance = distance;
         }
 
@@ -472,21 +475,21 @@ public class ShulkerTask extends InvTask {
         if (pendingFail == null) pendingFail = reason;
 
         // Always try to leave the world in the state we found it in.
-        if (mc.player.currentScreenHandler instanceof ShulkerBoxScreenHandler) mc.player.closeHandledScreen();
+        if (mc.player.containerMenu instanceof ShulkerBoxMenu) InvHelper.closeScreen();
 
-        setState(mc.world.getBlockState(pos).getBlock() instanceof ShulkerBoxBlock ? State.Break : State.Restore);
+        setState(mc.level.getBlockState(pos).getBlock() instanceof ShulkerBoxBlock ? State.Break : State.Restore);
         return Status.RUNNING;
     }
 
-    private void interact(BlockHitResult hitResult, Vec3d hitPos) {
+    private void interact(BlockHitResult hitResult, Vec3 hitPos) {
         Runnable action = () -> {
-            boolean sneaking = mc.player.isSneaking();
-            mc.player.setSneaking(false);
+            boolean sneaking = mc.player.isShiftKeyDown();
+            mc.player.setShiftKeyDown(false);
 
-            ActionResult result = mc.interactionManager.interactBlock(mc.player, Hand.MAIN_HAND, hitResult);
-            if (result.isAccepted()) mc.player.swingHand(Hand.MAIN_HAND);
+            InteractionResult result = mc.gameMode.useItemOn(mc.player, InteractionHand.MAIN_HAND, hitResult);
+            if (result.consumesAction()) mc.player.swing(InteractionHand.MAIN_HAND);
 
-            mc.player.setSneaking(sneaking);
+            mc.player.setShiftKeyDown(sneaking);
         };
 
         if (s.rotate.get()) Rotations.rotate(Rotations.getYaw(hitPos), Rotations.getPitch(hitPos), 100, action);
@@ -497,7 +500,7 @@ public class ShulkerTask extends InvTask {
     private int countShulkers() {
         int count = 0;
         for (int i = SlotUtils.HOTBAR_START; i <= SlotUtils.MAIN_END; i++) {
-            ItemStack stack = mc.player.getInventory().getStack(i);
+            ItemStack stack = mc.player.getInventory().getItem(i);
             if (InvHelper.isShulker(stack)) count += stack.getCount();
         }
         return count;
@@ -508,7 +511,7 @@ public class ShulkerTask extends InvTask {
      */
     private int findShulker() {
         for (int i = SlotUtils.HOTBAR_START; i <= SlotUtils.MAIN_END; i++) {
-            ItemStack stack = mc.player.getInventory().getStack(i);
+            ItemStack stack = mc.player.getInventory().getItem(i);
             if (!InvHelper.isShulker(stack)) continue;
             if (isSuitable(stack)) return i;
         }
@@ -542,7 +545,7 @@ public class ShulkerTask extends InvTask {
         if (mc.player == null) return false;
 
         for (int i = SlotUtils.HOTBAR_START; i <= SlotUtils.MAIN_END; i++) {
-            ItemStack stack = mc.player.getInventory().getStack(i);
+            ItemStack stack = mc.player.getInventory().getItem(i);
             if (!InvHelper.isShulker(stack)) continue;
 
             if (mode == Mode.Dump) {
@@ -565,16 +568,16 @@ public class ShulkerTask extends InvTask {
     }
 
     private BlockPos findPlacePos() {
-        BlockPos feet = mc.player.getBlockPos();
+        BlockPos feet = mc.player.blockPosition();
         BlockPos best = null;
         double bestDistance = Double.MAX_VALUE;
 
         for (int dy = 0; dy >= -1; dy--) {
             for (int dx = -2; dx <= 2; dx++) {
                 for (int dz = -2; dz <= 2; dz++) {
-                    BlockPos candidate = feet.add(dx, dy, dz);
+                    BlockPos candidate = feet.offset(dx, dy, dz);
 
-                    if (candidate.equals(feet) || candidate.equals(feet.up())) continue;
+                    if (candidate.equals(feet) || candidate.equals(feet.above())) continue;
                     if (!isPlaceable(candidate)) continue;
 
                     double distance = PlayerUtils.distanceTo(candidate);
@@ -592,12 +595,12 @@ public class ShulkerTask extends InvTask {
     private boolean isPlaceable(BlockPos candidate) {
         // The box is placed on top of the block below, so it faces up and needs free space above to open.
         if (!BlockUtils.canPlaceBlock(candidate, true, Blocks.SHULKER_BOX)) return false;
-        if (!mc.world.getBlockState(candidate.up()).isReplaceable()) return false;
+        if (!mc.level.getBlockState(candidate.above()).canBeReplaced()) return false;
 
-        BlockPos support = candidate.down();
-        var supportState = mc.world.getBlockState(support);
+        BlockPos support = candidate.below();
+        var supportState = mc.level.getBlockState(support);
 
-        if (supportState.isReplaceable()) return false;
+        if (supportState.canBeReplaced()) return false;
         if (!supportState.getFluidState().isEmpty()) return false;
         if (BlockUtils.isClickable(supportState.getBlock())) return false;
 
@@ -617,7 +620,7 @@ public class ShulkerTask extends InvTask {
 
         InvHelper.returnCursor(-1);
 
-        if (mc.player.currentScreenHandler instanceof ShulkerBoxScreenHandler) mc.player.closeHandledScreen();
+        if (mc.player.containerMenu instanceof ShulkerBoxMenu) InvHelper.closeScreen();
 
         if (swappedIntoHotbar && originalIndex != -1 && hotbarIndex != -1) {
             InvUtils.quickSwap().fromId(hotbarIndex).to(originalIndex);

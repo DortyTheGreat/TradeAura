@@ -3,7 +3,7 @@ package com.TradeAura.addon.inventory;
 import meteordevelopment.meteorclient.utils.player.InvUtils;
 import meteordevelopment.meteorclient.utils.player.Rotations;
 import meteordevelopment.meteorclient.utils.player.SlotUtils;
-import net.minecraft.item.ItemStack;
+import net.minecraft.world.item.ItemStack;
 
 import static meteordevelopment.meteorclient.MeteorClient.mc;
 
@@ -37,15 +37,15 @@ public class DropTask extends InvTask {
         if (mc.player == null) return fail("no player");
 
         // Never drop with a container open, the throw would be routed through that screen handler.
-        if (mc.player.currentScreenHandler != mc.player.playerScreenHandler) {
-            mc.player.closeHandledScreen();
+        if (mc.player.containerMenu != mc.player.inventoryMenu) {
+            InvHelper.closeScreen();
             return timedOut() ? fail("could not close the open screen") : Status.RUNNING;
         }
 
         if (!rotationRequested) {
             rotationRequested = true;
 
-            float[] rotation = s.dropDirection.get().getRotation(mc.player.getYaw());
+            float[] rotation = s.dropDirection.get().getRotation(mc.player.getYRot());
             Rotations.rotate(rotation[0], rotation[1], 100, this::dropItems);
 
             return Status.RUNNING;
@@ -69,7 +69,7 @@ public class DropTask extends InvTask {
             int slotId = SlotUtils.indexToId(index);
             if (slotId == -1) break;
 
-            ItemStack stack = mc.player.getInventory().getStack(index);
+            ItemStack stack = mc.player.getInventory().getItem(index);
             int count = stack.getCount();
 
             if (count <= remaining) {

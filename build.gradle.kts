@@ -1,10 +1,10 @@
 plugins {
-    id("fabric-loom") version "1.14.10"
+    alias(libs.plugins.fabric.loom)
 }
 
 base {
     archivesName = properties["archives_base_name"] as String
-    version = properties["mod_version"] as String
+    version = libs.versions.mod.version.get()
     group = properties["maven_group"] as String
 }
 
@@ -17,45 +17,62 @@ repositories {
         name = "meteor-maven-snapshots"
         url = uri("https://maven.meteordev.org/snapshots")
     }
-    maven { url = uri("https://jitpack.io") }
 }
 
 dependencies {
     // Fabric
-    minecraft("com.mojang:minecraft:${properties["minecraft_version"] as String}")
-    mappings("net.fabricmc:yarn:${properties["yarn_mappings"] as String}:v2")
-    modImplementation("net.fabricmc:fabric-loader:${properties["loader_version"] as String}")
+    // 26.1 is unobfuscated: no mappings, and no modImplementation / remapJar anymore.
+    minecraft(libs.minecraft)
+    implementation(libs.fabric.loader)
 
     // Meteor
-    modImplementation("meteordevelopment:meteor-client:${properties["minecraft_version"] as String}-SNAPSHOT")
+    implementation(libs.meteor.client)
+}
+
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(libs.versions.jdk.get().toInt()))
+    }
+}
+
+fun toMinecraftCompat(version: String): String {
+    val match = Regex("""^(\d{2})\.([1-9]\d*)(?:\.([1-9]\d*))?$""")
+        .matchEntire(version)
+        ?: error("Invalid Minecraft version format: $version. Expected YY.D or YY.D.H")
+
+    val (year, drop, _) = match.destructured
+    return "$year.$drop"
 }
 
 tasks {
     processResources {
         val propertyMap = mapOf(
             "version" to project.version,
-            "mc_version" to project.property("minecraft_version"),
+            "minecraft_version" to toMinecraftCompat(libs.versions.minecraft.get()),
+            "jdk_version" to libs.versions.jdk.get(),
         )
 
+        inputs.properties(propertyMap)
         filesMatching("fabric.mod.json") {
             expand(propertyMap)
         }
     }
 
     jar {
-        val licenseSuffix = project.base.archivesName.get()
+        inputs.property("archivesName", project.base.archivesName.get())
+
         from("LICENSE") {
-            rename { "${it}_${licenseSuffix}" }
+            rename { "${it}_${inputs.properties["archivesName"]}" }
         }
     }
 
-    java {
-        sourceCompatibility = JavaVersion.VERSION_21
-        targetCompatibility = JavaVersion.VERSION_21
-    }
-
-    withType<JavaCompile> {
+    withType<JavaCompile>().configureEach {
         options.encoding = "UTF-8"
-        options.release = 21
+        options.compilerArgs.addAll(
+            listOf(
+                "-Xlint:deprecation",
+                "-Xlint:unchecked"
+            )
+        )
     }
 }

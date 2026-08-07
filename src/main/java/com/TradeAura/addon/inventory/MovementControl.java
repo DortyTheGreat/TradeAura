@@ -30,7 +30,7 @@ public final class MovementControl {
 
         if (mc.player != null) {
             mc.player.setSprinting(false);
-            mc.player.setSneaking(false);
+            mc.player.setShiftKeyDown(false);
         }
     }
 
@@ -53,7 +53,7 @@ public final class MovementControl {
         dx /= length;
         dz /= length;
 
-        double yaw = Math.toRadians(mc.player.getYaw());
+        double yaw = Math.toRadians(mc.player.getYRot());
         // Where "W" and "A" would take the player with the current yaw.
         double forwardX = -Math.sin(yaw), forwardZ = Math.cos(yaw);
         double leftX = Math.cos(yaw), leftZ = Math.sin(yaw);
@@ -65,14 +65,14 @@ public final class MovementControl {
         holding = true;
 
         // 0.35 is roughly the point where a diagonal is closer to the target than a single direction.
-        if (forward > 0.35) mc.options.forwardKey.setPressed(true);
-        else if (forward < -0.35) mc.options.backKey.setPressed(true);
+        if (forward > 0.35) mc.options.keyUp.setDown(true);
+        else if (forward < -0.35) mc.options.keyDown.setDown(true);
 
-        if (left > 0.35) mc.options.leftKey.setPressed(true);
-        else if (left < -0.35) mc.options.rightKey.setPressed(true);
+        if (left > 0.35) mc.options.keyLeft.setDown(true);
+        else if (left < -0.35) mc.options.keyRight.setDown(true);
 
         // Simple obstacle handling: bump into something -> hop over it.
-        if (mc.player.horizontalCollision && mc.player.isOnGround()) mc.options.jumpKey.setPressed(true);
+        if (mc.player.horizontalCollision && mc.player.onGround()) mc.options.keyJump.setDown(true);
     }
 
     /** Releases everything this class pressed. Safe to call at any time. */
@@ -86,11 +86,11 @@ public final class MovementControl {
     private static void releaseKeys() {
         if (mc.options == null) return;
 
-        mc.options.forwardKey.setPressed(false);
-        mc.options.backKey.setPressed(false);
-        mc.options.leftKey.setPressed(false);
-        mc.options.rightKey.setPressed(false);
-        mc.options.jumpKey.setPressed(false);
-        mc.options.sneakKey.setPressed(false);
+        mc.options.keyUp.setDown(false);
+        mc.options.keyDown.setDown(false);
+        mc.options.keyLeft.setDown(false);
+        mc.options.keyRight.setDown(false);
+        mc.options.keyJump.setDown(false);
+        mc.options.keyShift.setDown(false);
     }
 }

@@ -1,5 +1,6 @@
 package com.TradeAura.addon.modules;
 
+import com.TradeAura.addon.inventory.InvHelper;
 import com.TradeAura.addon.inventory.InventoryManager;
 import com.TradeAura.addon.inventory.InventorySettings;
 import com.TradeAura.addon.inventory.ItemRule;
@@ -29,37 +30,35 @@ import meteordevelopment.meteorclient.utils.render.color.SettingColor;
 import meteordevelopment.meteorclient.renderer.ShapeMode;
 import meteordevelopment.orbit.EventHandler;
 
-import net.minecraft.client.gui.screen.ingame.CraftingScreen;
-import net.minecraft.client.gui.screen.ingame.MerchantScreen;
-import net.minecraft.client.gui.screen.ingame.ShulkerBoxScreen;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.passive.VillagerEntity;
-import net.minecraft.entity.projectile.ProjectileUtil;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.nbt.NbtElement;
-import net.minecraft.nbt.NbtList;
-import net.minecraft.nbt.NbtString;
-import net.minecraft.network.packet.c2s.play.SelectMerchantTradeC2SPacket;
-import net.minecraft.network.packet.s2c.play.SetTradeOffersS2CPacket;
-import net.minecraft.registry.Registries;
-import net.minecraft.screen.MerchantScreenHandler;
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.Hand;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.Pair;
-import net.minecraft.util.hit.EntityHitResult;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.village.Merchant;
-import net.minecraft.village.TradeOffer;
-import net.minecraft.village.TradeOfferList;
-import net.minecraft.world.GameMode;
-import org.apache.commons.lang3.reflect.FieldUtils;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.client.gui.screens.inventory.MerchantScreen;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.npc.villager.Villager;
+import net.minecraft.world.entity.projectile.ProjectileUtil;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.Tag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.StringTag;
+import net.minecraft.network.protocol.game.ServerboundSelectTradePacket;
+import net.minecraft.network.protocol.game.ClientboundMerchantOffersPacket;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.world.inventory.CraftingMenu;
+import net.minecraft.world.inventory.MerchantMenu;
+import net.minecraft.world.inventory.ShulkerBoxMenu;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.Tuple;
+import net.minecraft.world.phys.EntityHitResult;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.util.Mth;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.item.trading.MerchantOffer;
+import net.minecraft.world.level.GameType;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -293,8 +292,8 @@ public class TradeAura extends Module {
     }
 
     @Override
-    public NbtCompound toTag() {
-        NbtCompound tag = super.toTag();
+    public CompoundTag toTag() {
+        CompoundTag tag = super.toTag();
         tag.put("buyRules", rulesToTag(buyRules));
         tag.put("sellRules", rulesToTag(sellRules));
         tag.put("dropRules", ItemRule.listToTag(invSettings.dropRules));
@@ -304,38 +303,38 @@ public class TradeAura extends Module {
     }
 
     @Override
-    public Module fromTag(NbtCompound tag) {
+    public Module fromTag(CompoundTag tag) {
         super.fromTag(tag);
         buyRules.clear();
         sellRules.clear();
         
-        if (tag.get("buyRules") instanceof NbtList buyList) {
+        if (tag.get("buyRules") instanceof ListTag buyList) {
             rulesFromTag(buyList, buyRules);
         }
-        if (tag.get("sellRules") instanceof NbtList sellList) {
+        if (tag.get("sellRules") instanceof ListTag sellList) {
             rulesFromTag(sellList, sellRules);
         }
-        if (tag.get("dropRules") instanceof NbtList dropList) {
+        if (tag.get("dropRules") instanceof ListTag dropList) {
             ItemRule.listFromTag(dropList, invSettings.dropRules);
         }
-        if (tag.get("dumpRules") instanceof NbtList dumpList) {
+        if (tag.get("dumpRules") instanceof ListTag dumpList) {
             ItemRule.listFromTag(dumpList, invSettings.dumpRules);
         }
-        if (tag.get("refillRules") instanceof NbtList refillList) {
+        if (tag.get("refillRules") instanceof ListTag refillList) {
             ItemRule.listFromTag(refillList, invSettings.refillRules);
         }
         
         return this;
     }
 
-    private NbtList rulesToTag(List<TradeRule> rules) {
-        NbtList list = new NbtList();
+    private ListTag rulesToTag(List<TradeRule> rules) {
+        ListTag list = new ListTag();
         for (TradeRule rule : rules) {
-            NbtCompound ruleTag = new NbtCompound();
-            NbtList itemsList = new NbtList();
+            CompoundTag ruleTag = new CompoundTag();
+            ListTag itemsList = new ListTag();
             for (Item item : rule.items) {
-                Identifier id = Registries.ITEM.getId(item);
-                if (id != null) itemsList.add(NbtString.of(id.toString()));
+                Identifier id = BuiltInRegistries.ITEM.getKey(item);
+                if (id != null) itemsList.add(StringTag.valueOf(id.toString()));
             }
             ruleTag.put("items", itemsList);
             ruleTag.putInt("value1", rule.value1);
@@ -345,26 +344,26 @@ public class TradeAura extends Module {
         return list;
     }
 
-    private void rulesFromTag(NbtList list, List<TradeRule> rules) {
-        for (NbtElement element : list) {
-            if (element instanceof NbtCompound ruleTag) {
+    private void rulesFromTag(ListTag list, List<TradeRule> rules) {
+        for (Tag element : list) {
+            if (element instanceof CompoundTag ruleTag) {
                 TradeRule rule = new TradeRule();
                 
-                if (ruleTag.get("items") instanceof NbtList itemsList) {
-                    for (NbtElement itemElement : itemsList) {
-                        if (itemElement instanceof NbtString itemString) {
+                if (ruleTag.get("items") instanceof ListTag itemsList) {
+                    for (Tag itemElement : itemsList) {
+                        if (itemElement instanceof StringTag itemString) {
                             itemString.asString().ifPresent(idStr -> {
                                 Identifier id = Identifier.tryParse(idStr);
-                                if (id != null && Registries.ITEM.containsId(id)) {
-                                    rule.items.add(Registries.ITEM.get(id));
+                                if (id != null && BuiltInRegistries.ITEM.containsKey(id)) {
+                                    rule.items.add(BuiltInRegistries.ITEM.getValue(id));
                                 }
                             });
                         }
                     }
                 }
                 
-                rule.value1 = ruleTag.getInt("value1").orElse(-1);
-                rule.value2 = ruleTag.getInt("value2").orElse(-1);
+                rule.value1 = ruleTag.getIntOr("value1", -1);
+                rule.value2 = ruleTag.getIntOr("value2", -1);
                 rules.add(rule);
             }
         }
@@ -574,7 +573,7 @@ public class TradeAura extends Module {
     }
 
     private final List<Entity> targets = new ArrayList<>();
-    private final Map<Entity, Pair<Integer, Color>> VillagerCooldown = new HashMap<>();
+    private final Map<Entity, Tuple<Integer, Color>> VillagerCooldown = new HashMap<>();
     /** How often an unsynced villager has been retried in a row, see 'Refresh-unsynced-cooldown'. */
     private final Map<Entity, Integer> refreshCount = new HashMap<>();
     /** Scratch list for the movement check, so no list is allocated every tick. */
@@ -609,9 +608,9 @@ public class TradeAura extends Module {
 
     @Override
     public void onDeactivate() {
-        if (mc.player != null && mc.player.currentScreenHandler != null) {
-            mc.player.closeHandledScreen();
-            mc.player.getInventory().updateItems();
+        if (mc.player != null && mc.player.containerMenu != null) {
+            InvHelper.closeScreen();
+            mc.player.getInventory().tick();
         }
 
         targets.clear();
@@ -633,16 +632,18 @@ public class TradeAura extends Module {
 
         // Screens the inventory tasks open themselves, the handler is set either way.
         if (!invSettings.cancelScreens.get() || !invManager.isBusy()) return;
-        if (event.screen instanceof ShulkerBoxScreen || event.screen instanceof CraftingScreen) event.cancel();
+        if (!(event.screen instanceof AbstractContainerScreen<?> screen)) return;
+
+        if (screen.getMenu() instanceof ShulkerBoxMenu || screen.getMenu() instanceof CraftingMenu) event.cancel();
     }
 
     @EventHandler
     private void onPacketReceive(PacketEvent.Receive event) {
-        if (!(event.packet instanceof SetTradeOffersS2CPacket)) return;
+        if (!(event.packet instanceof ClientboundMerchantOffersPacket)) return;
 
         mc.execute(() -> {
             if (mc.player == null) return;
-            if (!(mc.player.currentScreenHandler instanceof MerchantScreenHandler MSH)) return;
+            if (!(mc.player.containerMenu instanceof MerchantMenu MSH)) return;
 
             syncing_func(MSH);
         });
@@ -652,8 +653,8 @@ public class TradeAura extends Module {
 
     private void updateColor(Color clr) {
         if (VillagerCooldown.containsKey(remember_entity)) {
-            Pair<Integer, Color> newPair = VillagerCooldown.get(remember_entity);
-            newPair.setRight(clr);
+            Tuple<Integer, Color> newPair = VillagerCooldown.get(remember_entity);
+            newPair.setB(clr);
             VillagerCooldown.replace(remember_entity, newPair);
 
             // The villager answered, so it is not "unsynced" anymore.
@@ -661,27 +662,26 @@ public class TradeAura extends Module {
         }
     }
 
-    private void syncing_func(MerchantScreenHandler MSH) {
+    private void syncing_func(MerchantMenu MSH) {
         if (buyRules.isEmpty() && sellRules.isEmpty()) {
             info("[TradeAura] Rules are empty — nothing to buy/sell. Configure them in the module GUI.");
         }
 
-        try {
-            if (!(FieldUtils.readField(MSH, "field_7863", true) instanceof Merchant merc)) return;
-            
-
-            TradeOfferList Offers = MSH.getRecipes();
+        {
+            // 1.21.11 read the private merchant field by its intermediary name ("field_7863"). 26.1 is
+            // unobfuscated, and the value was never used for anything but a type check, so it is gone.
+            var Offers = MSH.getOffers();
             int num = -1;
             updateColor(noTradesColor.get());
 
             boolean tradeHappened = false;
-            for (TradeOffer offer : Offers) {
+            for (MerchantOffer offer : Offers) {
                 num++;
 
-                ItemStack sellItem = offer.getSellItem();
-                ItemStack payItem = offer.getDisplayedFirstBuyItem();
+                ItemStack sellItem = offer.getResult();
+                ItemStack payItem = offer.getCostA();
 
-                boolean isSellingToVillager = sellItem.isOf(Items.EMERALD) && !payItem.isOf(Items.EMERALD);
+                boolean isSellingToVillager = sellItem.is(Items.EMERALD) && !payItem.is(Items.EMERALD);
 
                 if (isSellingToVillager) {
                     TradeRule sellRule = null;
@@ -696,7 +696,7 @@ public class TradeAura extends Module {
 
                     if (sellRule.value1 != -1 && payItem.getCount() > sellRule.value1) {
                         if (Debug.get())
-                            info(payItem.getName().getString() + " sell quantity too high: " + payItem.getCount() + " > " + sellRule.value1);
+                            info(payItem.getHoverName().getString() + " sell quantity too high: " + payItem.getCount() + " > " + sellRule.value1);
                         updateColor(TooExpensiveColor.get());
                         continue;
                     }
@@ -705,7 +705,7 @@ public class TradeAura extends Module {
                         int emeraldCount = countItemInInventory(Items.EMERALD);
                         if (emeraldCount >= sellRule.value2) {
                             if (Debug.get())
-                                info("Emerald limit reached for " + payItem.getName().getString() + ": " + emeraldCount + "/" + sellRule.value2);
+                                info("Emerald limit reached for " + payItem.getHoverName().getString() + ": " + emeraldCount + "/" + sellRule.value2);
                             updateColor(limitReachedColor.get());
                             continue;
                         }
@@ -714,19 +714,19 @@ public class TradeAura extends Module {
                     int availableCount = countItemInInventory(payItem.getItem());
                     if (availableCount < payItem.getCount()) {
                         if (Debug.get())
-                            info("Not enough " + payItem.getName().getString() + " to sell (have " + availableCount + ", need " + payItem.getCount() + ")");
+                            info("Not enough " + payItem.getHoverName().getString() + " to sell (have " + availableCount + ", need " + payItem.getCount() + ")");
                         updateColor(noSellItemsColor.get()); 
                         continue;
                     }
 
-                    if (offer.isDisabled()) {
+                    if (offer.isOutOfStock()) {
                         updateColor(disabledTradeColor.get());
                         continue;
                     }
 
-                    if (Debug.get()) info("SELLING " + payItem.getName().getString());
+                    if (Debug.get()) info("SELLING " + payItem.getHoverName().getString());
 
-                    mc.player.networkHandler.sendPacket(new SelectMerchantTradeC2SPacket(num));
+                    mc.player.connection.send(new ServerboundSelectTradePacket(num));
                     InvUtils.shiftClick().slotId(2);
                     tradeHappened = true;
                     continue;
@@ -749,9 +749,9 @@ public class TradeAura extends Module {
 						continue;
 					}
 					
-					if (payItem.isOf(Items.EMERALD) && payItem.getCount() > buyRule.value1) {
+					if (payItem.is(Items.EMERALD) && payItem.getCount() > buyRule.value1) {
                         if (Debug.get())
-                            info(offer.getSellItem().getName().getString() + " too expensive " + payItem.getCount());
+                            info(offer.getResult().getHoverName().getString() + " too expensive " + payItem.getCount());
                         updateColor(TooExpensiveColor.get());
                         continue;
                     }
@@ -760,22 +760,22 @@ public class TradeAura extends Module {
                         int currentCount = countItemInInventory(sellItem.getItem());
                         if (currentCount >= buyRule.value2) {
                             if (Debug.get())
-                                info(sellItem.getName().getString() + " limit reached: " + currentCount + "/" + buyRule.value2);
+                                info(sellItem.getHoverName().getString() + " limit reached: " + currentCount + "/" + buyRule.value2);
                             updateColor(limitReachedColor.get());
                             continue;
                         }
                     }
 
                     if (Debug.get()) {
-                        info("BUYING " + sellItem.getName().getString());
+                        info("BUYING " + sellItem.getHoverName().getString());
                     }
 
-                    if (offer.isDisabled()) {
+                    if (offer.isOutOfStock()) {
                         updateColor(disabledTradeColor.get());
                         continue;
                     }
 
-                    mc.player.networkHandler.sendPacket(new SelectMerchantTradeC2SPacket(num));
+                    mc.player.connection.send(new ServerboundSelectTradePacket(num));
                     InvUtils.shiftClick().slotId(2);
                     tradeHappened = true;
                 }
@@ -786,30 +786,26 @@ public class TradeAura extends Module {
             ticker_close = 0;
             pendingClose = true;
 
-        } catch (IllegalAccessException e) {
-            info("IAE ex");
-            ticker_close = 0;
-            pendingClose = true;
         }
     }
 
     private boolean entityCheck(Entity entity) {
         if (entity.equals(mc.player) || entity.equals(mc.getCameraEntity())) return false;
-        if ((entity instanceof LivingEntity livingEntity && livingEntity.isDead()) || !entity.isAlive()) return false;
+        if ((entity instanceof LivingEntity livingEntity && livingEntity.isDeadOrDying()) || !entity.isAlive()) return false;
 
-        Box hitbox = entity.getBoundingBox();
+        AABB hitbox = entity.getBoundingBox();
         if (!PlayerUtils.isWithin(
-                MathHelper.clamp(mc.player.getX(), hitbox.minX, hitbox.maxX),
-                MathHelper.clamp(mc.player.getY(), hitbox.minY, hitbox.maxY),
-                MathHelper.clamp(mc.player.getZ(), hitbox.minZ, hitbox.maxZ),
+                Mth.clamp(mc.player.getX(), hitbox.minX, hitbox.maxX),
+                Mth.clamp(mc.player.getY(), hitbox.minY, hitbox.maxY),
+                Mth.clamp(mc.player.getZ(), hitbox.minZ, hitbox.maxZ),
                 range.get()
         )) return false;
 
-        return entity instanceof VillagerEntity;
+        return entity instanceof Villager;
     }
 
-    public void lookAtVillager(Vec3d playerPos, Vec3d villagerPos) {
-        Vec3d direction = villagerPos.subtract(playerPos).normalize();
+    public void lookAtVillager(Vec3 playerPos, Vec3 villagerPos) {
+        Vec3 direction = villagerPos.subtract(playerPos).normalize();
         double yaw = Math.toDegrees(Math.atan2(direction.z, direction.x)) - 90;
         double pitch = Math.toDegrees(-Math.atan2(direction.y, Math.sqrt(direction.x * direction.x + direction.z * direction.z)));
 
@@ -820,23 +816,35 @@ public class TradeAura extends Module {
     }
 
     public void VillagerInteract(Entity villager) {
-        Vec3d playerPos = mc.player.getEyePos();
-        Vec3d villagerPos = villager.getEyePos();
-        EntityHitResult entityHitResult = ProjectileUtil.raycast(mc.player, playerPos, villagerPos, villager.getBoundingBox(), Entity::canHit, playerPos.squaredDistanceTo(villagerPos));
-        
+        Vec3 playerPos = mc.player.getEyePosition();
+        Vec3 villagerPos = villager.getEyePosition();
+        EntityHitResult entityHitResult = ProjectileUtil.getEntityHitResult(mc.player, playerPos, villagerPos, villager.getBoundingBox(), Entity::isPickable, playerPos.distanceToSqr(villagerPos));
+
         if (entityHitResult == null) {
-            ActionResult actionResultDirect = mc.interactionManager.interactEntity(mc.player, villager, Hand.MAIN_HAND);
             if (Debug.get()) info("Raycast didn't find a target");
-        } else {
-            if (rotateToVillager.get()) {
-                lookAtVillager(playerPos, villagerPos);
-            }
-            ActionResult actionResult = mc.interactionManager.interactEntityAtLocation(mc.player, villager, entityHitResult, Hand.MAIN_HAND);
-            if (!actionResult.isAccepted()) {
-                ActionResult actionResultDirect = mc.interactionManager.interactEntity(mc.player, villager, Hand.MAIN_HAND);
-                if (Debug.get()) info("Action wasn't accepted");
-            }
+            interactWith(villager, hitResultFor(villager));
+            return;
         }
+
+        if (rotateToVillager.get()) lookAtVillager(playerPos, villagerPos);
+
+        InteractionResult actionResult = interactWith(villager, entityHitResult);
+        if (!actionResult.consumesAction()) {
+            if (Debug.get()) info("Action wasn't accepted");
+            interactWith(villager, hitResultFor(villager));
+        }
+    }
+
+    private EntityHitResult hitResultFor(Entity entity) {
+        return new EntityHitResult(entity, entity.getBoundingBox().getCenter());
+    }
+
+    /**
+     * 26.1 no longer has separate interactEntity / interactEntityAtLocation methods, everything goes through
+     * one interact call that always takes the hit location.
+     */
+    private InteractionResult interactWith(Entity entity, EntityHitResult hitResult) {
+        return mc.gameMode.interact(mc.player, entity, hitResult, InteractionHand.MAIN_HAND);
     }
 
     /** Is there a villager in range that the aura would interact with right now? */
@@ -855,7 +863,7 @@ public class TradeAura extends Module {
     }
 
     private void cancelPlayerMovementControl() {
-        if (mc.player == null || mc.player.input == null) return;
+        if (mc.player == null) return;
 
         int ticksRemaining = ticks_to_wait.get() - ticker;
         boolean interactionClose = ticksRemaining >= 0 && ticksRemaining <= ticks_to_cancel_movement.get();
@@ -865,23 +873,22 @@ public class TradeAura extends Module {
 
         if (mc.player != null) {
             mc.player.setSprinting(false);
-            mc.player.setSneaking(false);
-            mc.player.input.jump();
+            mc.player.setShiftKeyDown(false);
         }
 
         if (mc.options != null) {
-            mc.options.forwardKey.setPressed(false);
-            mc.options.backKey.setPressed(false);
-            mc.options.leftKey.setPressed(false);
-            mc.options.rightKey.setPressed(false);
-            mc.options.jumpKey.setPressed(false);
-            mc.options.sneakKey.setPressed(false);
+            mc.options.keyUp.setDown(false);
+            mc.options.keyDown.setDown(false);
+            mc.options.keyLeft.setDown(false);
+            mc.options.keyRight.setDown(false);
+            mc.options.keyJump.setDown(false);
+            mc.options.keyShift.setDown(false);
         }
     }
 
     // NEW METHOD: Pre-check whether to click the villager
     private boolean shouldSkipVillager(Entity target) {
-        if (!(target instanceof VillagerEntity villager)) return false;
+        if (!(target instanceof Villager villager)) return false;
 
         String professionName = "any";
 		
@@ -935,16 +942,16 @@ public class TradeAura extends Module {
 
     /**
      * An entity that is still rendered with the default color never made it past
-     * {@link #syncing_func(MerchantScreenHandler)}, which means the interaction was lost. Dropping it from the
+     * {@link #syncing_func(MerchantMenu)}, which means the interaction was lost. Dropping it from the
      * cooldown map makes the aura interact with it again on this very tick.
      */
     private boolean shouldRefreshCooldown(Entity target) {
         if (!refreshUnsynced.get()) return false;
 
-        Pair<Integer, Color> entry = VillagerCooldown.get(target);
+        Tuple<Integer, Color> entry = VillagerCooldown.get(target);
         if (entry == null) return false;
-        if (!entry.getRight().equals(defaultColor.get())) return false;
-        if (entry.getLeft() < refreshDelay.get()) return false;
+        if (!entry.getB().equals(defaultColor.get())) return false;
+        if (entry.getA() < refreshDelay.get()) return false;
 
         int tries = refreshCount.getOrDefault(target, 0);
         if (tries >= maxRefreshes.get()) return false;
@@ -956,8 +963,8 @@ public class TradeAura extends Module {
 
     @EventHandler
     private void onTick(TickEvent.Pre event) {
-        if (mc.player == null || mc.world == null) return;
-        if (!mc.player.isAlive() || PlayerUtils.getGameMode() == GameMode.SPECTATOR) return;
+        if (mc.player == null || mc.level == null) return;
+        if (!mc.player.isAlive() || PlayerUtils.getGameMode() == GameType.SPECTATOR) return;
 
         // Inventory manipulation always wins: while an action runs the aura stands down completely.
         if (aura.get() && invManager.tick()) {
@@ -975,15 +982,15 @@ public class TradeAura extends Module {
         if (ticker < ticks_to_wait.get()) return;
         ticker = 0;
 
-        if (mc.player.currentScreenHandler instanceof MerchantScreenHandler) {
+        if (mc.player.containerMenu instanceof MerchantMenu) {
             if (!Close.get()) return;
             if (!pendingClose) return;
 
             if (++ticker_close < ticks_to_close.get()) return;
             ticker_close = 0;
             pendingClose = false;
-            mc.player.closeHandledScreen();
-            mc.player.getInventory().updateItems();
+            InvHelper.closeScreen();
+            mc.player.getInventory().tick();
             return;
         }
         if (!aura.get()) return;
@@ -999,32 +1006,32 @@ public class TradeAura extends Module {
 
             if (shouldSkipVillager(targett)) {
                 if (Debug.get()) info("Skipped villager (pre-check: no valid trades possible).");
-                VillagerCooldown.put(targett, new Pair<>(0, limitReachedColor.get()));
+                VillagerCooldown.put(targett, new Tuple<>(0, limitReachedColor.get()));
                 continue;
             }
 
             remember_entity = targett;
-            VillagerCooldown.put(targett, new Pair<>(0, defaultColor.get()));
+            VillagerCooldown.put(targett, new Tuple<>(0, defaultColor.get()));
             if (rotateToVillager.get()) {
                 VillagerInteract(targett);
             } else {
                 if (Debug.get()) info("Rotation disabled, interacting without rotating.");
-                ActionResult actionResult = mc.interactionManager.interactEntity(mc.player, targett, Hand.MAIN_HAND);
-                if (!actionResult.isAccepted() && Debug.get()) {
+                InteractionResult actionResult = interactWith(targett, hitResultFor(targett));
+                if (!actionResult.consumesAction() && Debug.get()) {
                     info("Aura interaction was not accepted.");
                 }
             }
             break;
         }
 
-        for (Map.Entry<Entity, Pair<Integer, Color>> e : new HashMap<>(VillagerCooldown).entrySet()) {
-            int time = e.getValue().getLeft();
-            Color clr = e.getValue().getRight();
+        for (Map.Entry<Entity, Tuple<Integer, Color>> e : new HashMap<>(VillagerCooldown).entrySet()) {
+            int time = e.getValue().getA();
+            Color clr = e.getValue().getB();
             if (time > forget.get()) {
                 VillagerCooldown.remove(e.getKey());
                 refreshCount.remove(e.getKey());
             } else {
-                VillagerCooldown.replace(e.getKey(), new Pair<>(time + 1, clr));
+                VillagerCooldown.replace(e.getKey(), new Tuple<>(time + 1, clr));
             }
         }
     }
@@ -1033,9 +1040,9 @@ public class TradeAura extends Module {
     private void onRender3D(Render3DEvent event) {
         if (!render.get()) return;
 
-        for (Map.Entry<Entity, Pair<Integer, Color>> e : new HashMap<>(VillagerCooldown).entrySet()) {
+        for (Map.Entry<Entity, Tuple<Integer, Color>> e : new HashMap<>(VillagerCooldown).entrySet()) {
             Entity entity = e.getKey();
-            drawBoundingBox(event, entity, e.getValue().getRight());
+            drawBoundingBox(event, entity, e.getValue().getB());
         }
     }
 
@@ -1046,11 +1053,11 @@ public class TradeAura extends Module {
         lineColor.set(color);
         sideColor.set(color).a((int) (sideColor.a * fillOpacity.get()));
 
-        double x = MathHelper.lerp(event.tickDelta, entity.lastRenderX, entity.getX()) - entity.getX();
-        double y = MathHelper.lerp(event.tickDelta, entity.lastRenderY, entity.getY()) - entity.getY();
-        double z = MathHelper.lerp(event.tickDelta, entity.lastRenderZ, entity.getZ()) - entity.getZ();
+        double x = Mth.lerp(event.tickDelta, entity.xOld, entity.getX()) - entity.getX();
+        double y = Mth.lerp(event.tickDelta, entity.yOld, entity.getY()) - entity.getY();
+        double z = Mth.lerp(event.tickDelta, entity.zOld, entity.getZ()) - entity.getZ();
 
-        Box box = entity.getBoundingBox();
+        AABB box = entity.getBoundingBox();
         event.renderer.box(x + box.minX, y + box.minY, z + box.minZ, x + box.maxX, y + box.maxY, z + box.maxZ, sideColor, lineColor, ShapeMode.Both, 0);
     }
 }

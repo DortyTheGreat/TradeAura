@@ -1,8 +1,8 @@
 package com.TradeAura.addon.inventory;
 
 import com.TradeAura.addon.modules.TradeAura;
-import net.minecraft.item.Item;
-import net.minecraft.item.Items;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.Items;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -60,7 +60,7 @@ public class InventoryManager {
      * @return true when an inventory action is running and the aura has to stand down this tick
      */
     public boolean tick() {
-        if (!s.enabled.get() || mc.player == null || mc.world == null) {
+        if (!s.enabled.get() || mc.player == null || mc.level == null) {
             if (task != null) reset();
             return false;
         }
@@ -105,8 +105,8 @@ public class InventoryManager {
 
         // Nothing is allowed to start while another screen (e.g. the trading screen) is still open.
         // Checked before the chain counter so waiting for the screen does not eat the chain budget.
-        if (mc.player.currentScreenHandler != mc.player.playerScreenHandler) {
-            mc.player.closeHandledScreen();
+        if (mc.player.containerMenu != mc.player.inventoryMenu) {
+            InvHelper.closeScreen();
             return true;
         }
 
