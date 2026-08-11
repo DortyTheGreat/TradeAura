@@ -2,14 +2,16 @@
   "schemaVersion": 1,
   "id": "${mod_id}",
   "version": "${version}",
-  "name": "${mod_name}",
+  "name": "${display_name}",
   "description": "${mod_description}",
   "authors": [
     "${mod_author}"
   ],
   "contact": {
-    "repo": "${mod_repo}"
+    "sources": "${mod_repo}",
+    "issues": "${mod_repo}/issues"
   },
+  "license": "GPL-3.0-or-later",
   "icon": "assets/template/icon.png",
   "environment": "client",
   "entrypoints": {
@@ -20,11 +22,16 @@
   "mixins": [
   ],
   "custom": {
-    "meteor-client:color": "${mod_color}"
+    "meteor-client:color": "${mod_color}",
+    "modmenu": {
+      "parent": {
+        "id": "meteor-client"
+      }
+    }
   },
   "depends": {
     "java": ">=${jdk_version}",
-    "minecraft": ">=${minecraft_version}",
+    "minecraft": "${minecraft_depends}",
     "meteor-client": "*"
   }
 }

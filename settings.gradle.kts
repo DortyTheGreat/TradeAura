@@ -12,9 +12,15 @@ pluginManagement {
     val loom_version: String by settings
 
     plugins {
-		id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
         id("net.fabricmc.fabric-loom") version loom_version
     }
+}
+
+// Has to be applied here (a real plugins {} block, not pluginManagement.plugins) to actually
+// register the toolchain repositories - that's what was missing and caused the auto-provisioning
+// deprecation warning.
+plugins {
+    id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
 }
 
 val mod_name: String by settings
