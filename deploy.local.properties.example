@@ -1,0 +1,23 @@
+# Copy to deploy.local.properties (gitignored - machine specific) and fill in.
+# Read by the deploy and runInstance tasks.
+#
+# ${other_key} references are expanded, so nothing has to be typed twice.
+
+# Instance ID: the folder name under PrismLauncher\instances\
+# (right-click the instance in PrismLauncher -> Instance Folder to confirm).
+prism_instance=26.1.2 - meteor
+
+# PrismLauncher's data folder. mods_dir is derived from this plus the
+# instance name, so renaming an instance means editing one line.
+prism_root=C:\\Users\\you\\AppData\\Roaming\\PrismLauncher
+
+# Only needed for a non-standard layout. Leave commented out and the path
+# above is used: <prism_root>\instances\<prism_instance>\minecraft\mods
+#
+# Backslashes must be doubled - this is a .properties file, so a single \
+# is an escape character.
+#mods_dir=${prism_root}\\instances\\${prism_instance}\\minecraft\\mods
+
+# Full path to prismlauncher.exe. Leave blank to build and deploy without
+# launching anything.
+prism_exe=C:\\Users\\you\\AppData\\Local\\Programs\\PrismLauncher\\prismlauncher.exe

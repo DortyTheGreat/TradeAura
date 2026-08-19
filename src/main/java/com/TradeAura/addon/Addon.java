@@ -24,6 +24,7 @@ import meteordevelopment.meteorclient.addons.GithubRepo;
 import meteordevelopment.meteorclient.addons.MeteorAddon;
 import meteordevelopment.meteorclient.systems.modules.Category;
 import meteordevelopment.meteorclient.systems.modules.Modules;
+import meteordevelopment.meteorclient.utils.render.DisplayItemUtils;
 import net.minecraft.world.item.Items;
 import org.slf4j.Logger;
 
@@ -34,7 +35,20 @@ import org.slf4j.Logger;
 public class Addon extends MeteorAddon {
     public static final Logger LOG = LogUtils.getLogger();
 
-    public static Category CATEGORY = new Category(BuildConfig.CATEGORY_NAME, () -> Items.DRIED_KELP.getDefaultInstance());
+    /**
+     * DisplayItemUtils.toStack, NOT Items.DRIED_KELP.getDefaultInstance().
+     *
+     * getDefaultInstance() builds a real ItemStack, which reads the item's
+     * data components - and those are only bound once the registries have
+     * finished loading. Opening the Meteor GUI then throws "Components not
+     * bound yet" and takes the whole client down. The Supplier defers the
+     * call but not far enough to guarantee it.
+     *
+     * This is the helper Meteor's own Categories class uses, for exactly
+     * this reason.
+     */
+    public static Category CATEGORY = new Category(
+        BuildConfig.CATEGORY_NAME, () -> DisplayItemUtils.toStack(Items.DRIED_KELP));
 
     @Override
     public void onInitialize() {
