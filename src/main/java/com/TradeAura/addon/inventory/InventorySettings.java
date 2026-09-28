@@ -1,3 +1,21 @@
+/*
+ * TradeAura - Meteor Client addon for automated villager trading.
+ * Copyright (C) 2026 DortyTheGreat
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
+
 package com.TradeAura.addon.inventory;
 
 import meteordevelopment.meteorclient.settings.*;
@@ -79,7 +97,7 @@ public class InventorySettings {
         this.group = group;
 
         enabled = group.add(new BoolSetting.Builder()
-            .name("Inventory-manipulation")
+            .name("inventory-manipulation")
             .description("Master switch of every inventory trigger below. Each trigger interrupts the aura while it runs.")
             .defaultValue(false)
             .onChanged(v -> onVisibilityChanged.run())
@@ -87,7 +105,7 @@ public class InventorySettings {
         );
 
         actionDelay = group.add(new IntSetting.Builder()
-            .name("Action-delay")
+            .name("action-delay")
             .description("Ticks to wait between two inventory operations, gives the server time to confirm the previous one.")
             .defaultValue(2)
             .min(0)
@@ -97,7 +115,7 @@ public class InventorySettings {
         );
 
         actionTimeout = group.add(new IntSetting.Builder()
-            .name("Action-timeout")
+            .name("action-timeout")
             .description("How many ticks a single step (placing, opening, breaking, ...) may take before the action is aborted.")
             .defaultValue(60)
             .min(10)
@@ -107,7 +125,7 @@ public class InventorySettings {
         );
 
         failCooldown = group.add(new IntSetting.Builder()
-            .name("Fail-cooldown")
+            .name("fail-cooldown")
             .description("Ticks a trigger is skipped after it failed, stops the module from retrying a hopeless action forever.")
             .defaultValue(100)
             .min(0)
@@ -117,7 +135,7 @@ public class InventorySettings {
         );
 
         maxChain = group.add(new IntSetting.Builder()
-            .name("Max-chained-actions")
+            .name("max-chained-actions")
             .description("Triggers may chain into each other (low emeralds -> craft -> low blocks -> refill). This caps how many actions may run back to back before the module assumes the settings contradict each other.")
             .defaultValue(12)
             .min(1)
@@ -127,7 +145,7 @@ public class InventorySettings {
         );
 
         cancelScreens = group.add(new BoolSetting.Builder()
-            .name("Cancel-screens")
+            .name("cancel-screens")
             .description("Do not render the crafting / shulker screens the module opens.")
             .defaultValue(true)
             .visible(enabled::get)
@@ -135,7 +153,7 @@ public class InventorySettings {
         );
 
         rotate = group.add(new BoolSetting.Builder()
-            .name("Rotate")
+            .name("rotate")
             .description("Rotate towards the crafting table / shulker box the module interacts with.")
             .defaultValue(true)
             .visible(enabled::get)
@@ -143,7 +161,7 @@ public class InventorySettings {
         );
 
         amountMode = group.add(new EnumSetting.Builder<AmountMode>()
-            .name("Amount-mode")
+            .name("amount-mode")
             .description("ToLimit moves everything down/up to the leave value in one go. TriggerMinusLeave moves exactly (trigger - leave) per action, which may need several chained actions.")
             .defaultValue(AmountMode.ToLimit)
             .visible(enabled::get)
@@ -151,7 +169,7 @@ public class InventorySettings {
         );
 
         clicksPerTick = group.add(new IntSetting.Builder()
-            .name("Clicks-per-tick")
+            .name("clicks-per-tick")
             .description("How many inventory clicks the crafting triggers may send within one tick. Higher is faster, lower is gentler on anticheats.")
             .defaultValue(64)
             .min(8)
@@ -163,7 +181,7 @@ public class InventorySettings {
         // Drop
 
         dropEnabled = group.add(new BoolSetting.Builder()
-            .name("Drop-excess-items")
+            .name("drop-excess-items")
             .description("Throws away everything above the limit configured in the Drop Rules table.")
             .defaultValue(false)
             .visible(enabled::get)
@@ -172,7 +190,7 @@ public class InventorySettings {
         );
 
         dropDirection = group.add(new EnumSetting.Builder<DropDirection>()
-            .name("Drop-direction")
+            .name("drop-direction")
             .description("Where to throw the items, relative to the player.")
             .defaultValue(DropDirection.Forward)
             .visible(() -> enabled.get() && dropEnabled.get())
@@ -182,7 +200,7 @@ public class InventorySettings {
         // Compress
 
         compressEnabled = group.add(new BoolSetting.Builder()
-            .name("Compress-emeralds")
+            .name("compress-emeralds")
             .description("Crafts excess emeralds into emerald blocks. Needs a crafting table in range, otherwise the trigger does not fire.")
             .defaultValue(false)
             .visible(enabled::get)
@@ -190,7 +208,7 @@ public class InventorySettings {
         );
 
         compressTrigger = group.add(new IntSetting.Builder()
-            .name("Compress-trigger")
+            .name("compress-trigger")
             .description("Fires when the emerald count is above this value.")
             .defaultValue(128)
             .min(1)
@@ -200,7 +218,7 @@ public class InventorySettings {
         );
 
         compressLeave = group.add(new IntSetting.Builder()
-            .name("Compress-leave")
+            .name("compress-leave")
             .description("How many emeralds stay in the inventory, the rest (trigger - leave) is crafted into blocks.")
             .defaultValue(64)
             .min(0)
@@ -210,7 +228,7 @@ public class InventorySettings {
         );
 
         craftingTableRange = group.add(new DoubleSetting.Builder()
-            .name("Crafting-table-range")
+            .name("crafting-table-range")
             .description("How far away a crafting table may be for the table recipes to fire.")
             .defaultValue(4.0)
             .min(1)
@@ -220,7 +238,7 @@ public class InventorySettings {
         );
 
         maxCrafts = group.add(new IntSetting.Builder()
-            .name("Max-crafts-per-action")
+            .name("max-crafts-per-action")
             .description("Upper limit of crafts a single crafting action performs. A grid slot cannot hold more than a stack, so 64 is the maximum.")
             .defaultValue(CraftTask.MAX_CRAFTS)
             .min(1)
@@ -232,7 +250,7 @@ public class InventorySettings {
         // Decompress
 
         decompressEnabled = group.add(new BoolSetting.Builder()
-            .name("Decompress-emeralds")
+            .name("decompress-emeralds")
             .description("Crafts emerald blocks back into emeralds using the 2x2 grid, no crafting table needed. Does not fire without blocks in the inventory.")
             .defaultValue(false)
             .visible(enabled::get)
@@ -240,7 +258,7 @@ public class InventorySettings {
         );
 
         decompressTrigger = group.add(new IntSetting.Builder()
-            .name("Decompress-trigger")
+            .name("decompress-trigger")
             .description("Fires when the emerald count is below this value.")
             .defaultValue(32)
             .min(0)
@@ -250,7 +268,7 @@ public class InventorySettings {
         );
 
         decompressLeave = group.add(new IntSetting.Builder()
-            .name("Decompress-target")
+            .name("decompress-target")
             .description("Emerald count to restore, the missing amount (target - trigger) is crafted from blocks.")
             .defaultValue(128)
             .min(1)
@@ -262,7 +280,7 @@ public class InventorySettings {
         // Glass panes
 
         glassPanesEnabled = group.add(new BoolSetting.Builder()
-            .name("Craft-glass-panes")
+            .name("craft-glass-panes")
             .description("Crafts excess glass into glass panes (6 -> 16). Needs a crafting table in range, otherwise the trigger does not fire.")
             .defaultValue(false)
             .visible(enabled::get)
@@ -270,7 +288,7 @@ public class InventorySettings {
         );
 
         glassTrigger = group.add(new IntSetting.Builder()
-            .name("Glass-trigger")
+            .name("glass-trigger")
             .description("Fires when the glass count is above this value.")
             .defaultValue(64)
             .min(1)
@@ -280,7 +298,7 @@ public class InventorySettings {
         );
 
         glassLeave = group.add(new IntSetting.Builder()
-            .name("Glass-leave")
+            .name("glass-leave")
             .description("How much glass stays in the inventory, the rest is crafted into panes.")
             .defaultValue(0)
             .min(0)
@@ -292,7 +310,7 @@ public class InventorySettings {
         // Dump
 
         dumpEnabled = group.add(new BoolSetting.Builder()
-            .name("Dump-to-shulker")
+            .name("dump-to-shulker")
             .description("Places a shulker box, stores everything above the limit configured in the Dump Rules table, breaks it and picks it back up.")
             .defaultValue(false)
             .visible(enabled::get)
@@ -303,7 +321,7 @@ public class InventorySettings {
         // Refill
 
         refillEnabled = group.add(new BoolSetting.Builder()
-            .name("Refill-from-shulker")
+            .name("refill-from-shulker")
             .description("Same as Dump, but pulls the missing items out of the shulker box.")
             .defaultValue(false)
             .visible(enabled::get)
@@ -312,7 +330,7 @@ public class InventorySettings {
         );
 
         shulkerAutoTool = group.add(new BoolSetting.Builder()
-            .name("Shulker-auto-tool")
+            .name("shulker-auto-tool")
             .description("Swap to the fastest tool in the hotbar before breaking the shulker box.")
             .defaultValue(true)
             .visible(() -> enabled.get() && (dumpEnabled.get() || refillEnabled.get()))
@@ -320,7 +338,7 @@ public class InventorySettings {
         );
 
         transferBatch = group.add(new IntSetting.Builder()
-            .name("Transfers-per-tick")
+            .name("transfers-per-tick")
             .description("How many stacks are moved into / out of the shulker box per tick. Low values make a big dump take forever.")
             .defaultValue(12)
             .min(1)
@@ -330,7 +348,7 @@ public class InventorySettings {
         );
 
         lockMovement = group.add(new BoolSetting.Builder()
-            .name("Lock-movement-while-placed")
+            .name("lock-movement-while-placed")
             .description("Suppress your own movement input from the moment the shulker box is placed until it is broken again. Only the input is blocked, movement packets keep being sent, so nothing desyncs.")
             .defaultValue(true)
             .visible(() -> enabled.get() && (dumpEnabled.get() || refillEnabled.get()))
@@ -338,7 +356,7 @@ public class InventorySettings {
         );
 
         walkToDrop = group.add(new BoolSetting.Builder()
-            .name("Walk-to-dropped-shulker")
+            .name("walk-to-dropped-shulker")
             .description("Walk over to the broken shulker box if it landed out of pickup range instead of leaving it behind.")
             .defaultValue(true)
             .visible(() -> enabled.get() && (dumpEnabled.get() || refillEnabled.get()))
@@ -346,7 +364,7 @@ public class InventorySettings {
         );
 
         shulkerPickupTicks = group.add(new IntSetting.Builder()
-            .name("Shulker-pickup-ticks")
+            .name("shulker-pickup-ticks")
             .description("How long to wait for (and walk towards) the broken shulker box before giving up on it.")
             .defaultValue(80)
             .min(0)

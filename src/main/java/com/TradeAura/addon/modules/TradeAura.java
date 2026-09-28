@@ -1,3 +1,21 @@
+/*
+ * TradeAura - Meteor Client addon for automated villager trading.
+ * Copyright (C) 2026 DortyTheGreat
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
+
 package com.TradeAura.addon.modules;
 
 import com.TradeAura.addon.inventory.InvHelper;
@@ -78,34 +96,34 @@ public class TradeAura extends Module {
     /** Runs the inventory triggers, interrupts the aura while an action is in progress. */
     private final InventoryManager invManager = new InventoryManager(this, invSettings);
 
-    private final Setting<Boolean> Debug = sgGeneral.add(new BoolSetting.Builder()
-            .name("Debug")
-            .description("notify with a message to debug module")
+    private final Setting<Boolean> debug = sgGeneral.add(new BoolSetting.Builder()
+            .name("debug")
+            .description("Print what the aura and the inventory manager are doing to chat.")
             .defaultValue(false)
             .build()
     );
 
-    private final Setting<Boolean> Close = sgGeneral.add(new BoolSetting.Builder()
-            .name("Close")
-            .description("Close trading screen after trade")
+    private final Setting<Boolean> close = sgGeneral.add(new BoolSetting.Builder()
+            .name("close")
+            .description("Close the trading screen automatically after trading.")
             .defaultValue(true)
             .build()
     );
 
-    private final Setting<Boolean> CancelEvent = sgGeneral.add(new BoolSetting.Builder()
-            .name("Cancel-Event")
-            .description("Prevents your eyes from bleeding")
+    private final Setting<Boolean> cancelEvent = sgGeneral.add(new BoolSetting.Builder()
+            .name("cancel-event")
+            .description("Never show the trading screen - trades still go through, the window just does not pop up.")
             .defaultValue(true)
             .build()
     );
 
-    private final Setting<Integer> ticks_to_close = sgGeneral.add(new IntSetting.Builder()
-            .name("Ticks-to-close")
-            .description("time before closing villager window in ticks")
+    private final Setting<Integer> ticksToClose = sgGeneral.add(new IntSetting.Builder()
+            .name("ticks-to-close")
+            .description("Ticks to wait before closing the trading screen.")
             .defaultValue(2)
             .min(0)
             .sliderMax(100)
-            .visible(Close::get)
+            .visible(close::get)
             .build()
     );
 
@@ -140,7 +158,7 @@ public class TradeAura extends Module {
 
         WSection buySection = rootList.add(theme.section("Buy Rules", true)).expandX().widget();
         WTable buyTable = buySection.add(theme.table()).expandX().widget();
-        
+
         buyTable.add(theme.label("Items")).expandX();
         buyTable.add(theme.label("Max Price")).minWidth(70);
         buyTable.add(theme.label("Buy Limit")).minWidth(70);
@@ -163,7 +181,7 @@ public class TradeAura extends Module {
 
         WSection sellSection = rootList.add(theme.section("Sell Rules", true)).expandX().widget();
         WTable sellTable = sellSection.add(theme.table()).expandX().widget();
-        
+
         sellTable.add(theme.label("Items")).expandX();
         sellTable.add(theme.label("Max Sell Qty")).minWidth(70);
         sellTable.add(theme.label("Emerald Limit")).minWidth(70);
@@ -273,7 +291,7 @@ public class TradeAura extends Module {
         SettingGroup hiddenGroup = dummySettings.createGroup("");
         hiddenGroup.sectionExpanded = (true);
         hiddenGroup.add(itemSetting);
-        
+
         table.add(theme.settings(dummySettings)).expandX().top();
 
         WIntEdit val1Edit = table.add(theme.intEdit(rule.value1, -1, 10000, false)).minWidth(70).top().widget();
@@ -305,10 +323,11 @@ public class TradeAura extends Module {
 
     @Override
     public Module fromTag(CompoundTag tag) {
+        migrateSettingNames(tag);
         super.fromTag(tag);
         buyRules.clear();
         sellRules.clear();
-        
+
         if (tag.get("buyRules") instanceof ListTag buyList) {
             rulesFromTag(buyList, buyRules);
         }
@@ -324,7 +343,7 @@ public class TradeAura extends Module {
         if (tag.get("refillRules") instanceof ListTag refillList) {
             ItemRule.listFromTag(refillList, invSettings.refillRules);
         }
-        
+
         return this;
     }
 
@@ -349,7 +368,7 @@ public class TradeAura extends Module {
         for (Tag element : list) {
             if (element instanceof CompoundTag ruleTag) {
                 TradeRule rule = new TradeRule();
-                
+
                 if (ruleTag.get("items") instanceof ListTag itemsList) {
                     for (Tag itemElement : itemsList) {
                         if (itemElement instanceof StringTag itemString) {
@@ -362,7 +381,7 @@ public class TradeAura extends Module {
                         }
                     }
                 }
-                
+
                 rule.value1 = ruleTag.getIntOr("value1", -1);
                 rule.value2 = ruleTag.getIntOr("value2", -1);
                 rules.add(rule);
@@ -371,15 +390,15 @@ public class TradeAura extends Module {
     }
 
     private final Setting<Boolean> aura = sgAura.add(new BoolSetting.Builder()
-            .name("Villager-Aura")
-            .description("Clicks on Villagers in range of your vision")
+            .name("villager-aura")
+            .description("Automatically interact with villagers in range.")
             .defaultValue(false)
             .build()
     );
 
-    private final Setting<Integer> ticks_to_wait = sgAura.add(new IntSetting.Builder()
-            .name("Ticks-to-wait")
-            .description("time before clicking another villager window in ticks")
+    private final Setting<Integer> ticksToWait = sgAura.add(new IntSetting.Builder()
+            .name("ticks-to-wait")
+            .description("Ticks between two villager interactions.")
             .defaultValue(1)
             .min(0)
             .sliderMax(100)
@@ -388,7 +407,7 @@ public class TradeAura extends Module {
     );
 
     private final Setting<Boolean> rotateToVillager = sgAura.add(new BoolSetting.Builder()
-            .name("Rotate-to-villager")
+            .name("rotate-to-villager")
             .description("Look at the villager before interacting")
             .defaultValue(true)
             .visible(aura::get)
@@ -396,16 +415,16 @@ public class TradeAura extends Module {
     );
 
     private final Setting<Boolean> cancelMovement = sgAura.add(new BoolSetting.Builder()
-            .name("Cancel-Movement")
+            .name("cancel-movement")
             .description("Block your movement input while a villager the aura can click is in range. Never triggers when there is nothing to trade with.")
             .defaultValue(false)
             .visible(aura::get)
             .build()
     );
 
-    private final Setting<Integer> ticks_to_cancel_movement = sgAura.add(new IntSetting.Builder()
-            .name("Ticks-to-cancel-movement")
-            .description("Block movement when fewer than this many ticks remain until the next interaction. If this is not clearly below Ticks-to-wait, every tick falls into the window and movement is blocked the whole time a villager is in range.")
+    private final Setting<Integer> ticksToCancelMovement = sgAura.add(new IntSetting.Builder()
+            .name("ticks-to-cancel-movement")
+            .description("Block movement when fewer than this many ticks remain until the next interaction. If this is not clearly below ticks-to-wait, every tick falls into the window and movement is blocked the whole time a villager is in range.")
             .defaultValue(2)
             .min(0)
             .sliderMax(20)
@@ -414,7 +433,7 @@ public class TradeAura extends Module {
     );
 
     private final Setting<Boolean> cancelMovementNearVillager = sgAura.add(new BoolSetting.Builder()
-            .name("Cancel-movement-near-villager")
+            .name("cancel-movement-near-villager")
             .description("Block movement the entire time a villager is in range instead of only inside the countdown window above. Keeps you from walking out of range mid trading.")
             .defaultValue(false)
             .visible(() -> aura.get() && cancelMovement.get())
@@ -460,7 +479,7 @@ public class TradeAura extends Module {
     );
 
     private final Setting<Boolean> refreshUnsynced = sgAura.add(new BoolSetting.Builder()
-            .name("Refresh-unsynced-cooldown")
+            .name("refresh-unsynced-cooldown")
             .description("If a villager never synced properly (it is still rendered with the default color), force its cooldown to refresh so the aura retries the interaction.")
             .defaultValue(true)
             .visible(aura::get)
@@ -468,8 +487,8 @@ public class TradeAura extends Module {
     );
 
     private final Setting<Integer> refreshDelay = sgAura.add(new IntSetting.Builder()
-            .name("Refresh-delay")
-            .description("How many aura cycles (Ticks-to-wait each) to give the server to answer before the cooldown of an unsynced villager is refreshed.")
+            .name("refresh-delay")
+            .description("How many aura cycles (ticks-to-wait each) to give the server to answer before the cooldown of an unsynced villager is refreshed.")
             .defaultValue(6)
             .min(1)
             .sliderMax(60)
@@ -478,7 +497,7 @@ public class TradeAura extends Module {
     );
 
     private final Setting<Integer> maxRefreshes = sgAura.add(new IntSetting.Builder()
-            .name("Max-refreshes")
+            .name("max-refreshes")
             .description("How often the same villager may be retried in a row before it is left alone until 'forget-after' expires. Stops the aura from spamming a villager that never answers.")
             .defaultValue(3)
             .min(1)
@@ -488,7 +507,7 @@ public class TradeAura extends Module {
     );
 
     private final Setting<Boolean> render = sgRender.add(new BoolSetting.Builder()
-            .name("Render")
+            .name("render")
             .description("Renders villagers that you've clicked")
             .defaultValue(false)
             .visible(aura::get)
@@ -545,7 +564,7 @@ public class TradeAura extends Module {
             .build()
     );
 
-    private final Setting<SettingColor> TooExpensiveColor = sgRender.add(new ColorSetting.Builder()
+    private final Setting<SettingColor> tooExpensiveColor = sgRender.add(new ColorSetting.Builder()
             .name("too-expensive-color")
             .description("Color for a high priced trade")
             .defaultValue(new SettingColor(255, 0, 150))
@@ -570,23 +589,67 @@ public class TradeAura extends Module {
     );
 
     public TradeAura(Category cat) {
-        super(cat, "Trade-Aura", "Trades with villagers for you");
+        super(cat, "trade-aura", "Trades with villagers for you");
+    }
+
+    /**
+     * Meteor runs every chat message through String.format, so a '%' in an item name (renamed on an
+     * anvil, say) would throw halfway through a tick. Plain messages go through "%s" instead and are
+     * shown verbatim. Calls with format arguments still reach the inherited varargs versions.
+     */
+    public void info(String message) {
+        super.info("%s", message);
+    }
+
+    /** See {@link #info(String)}. */
+    public void warning(String message) {
+        super.warning("%s", message);
+    }
+
+    /**
+     * Setting names used to be capitalised ("Action-delay", "Close"). Meteor looks settings up by
+     * exact name when loading, so without this every renamed setting would silently fall back to its
+     * default. Rewrites stored names to the current spelling before Meteor reads them.
+     */
+    private void migrateSettingNames(CompoundTag moduleTag) {
+        if (!(moduleTag.get("settings") instanceof CompoundTag settingsTag)) return;
+
+        for (Tag groupElement : settingsTag.getListOrEmpty("groups")) {
+            if (!(groupElement instanceof CompoundTag groupTag)) continue;
+
+            SettingGroup group = settings.getGroup(groupTag.getStringOr("name", ""));
+            if (group == null) continue;
+
+            for (Tag settingElement : groupTag.getListOrEmpty("settings")) {
+                if (!(settingElement instanceof CompoundTag settingTag)) continue;
+
+                String stored = settingTag.getStringOr("name", "");
+                if (group.get(stored) != null) continue;
+
+                for (Setting<?> setting : group) {
+                    if (setting.name.equalsIgnoreCase(stored)) {
+                        settingTag.putString("name", setting.name);
+                        break;
+                    }
+                }
+            }
+        }
     }
 
     private final List<Entity> targets = new ArrayList<>();
-    private final Map<Entity, Tuple<Integer, Color>> VillagerCooldown = new HashMap<>();
-    /** How often an unsynced villager has been retried in a row, see 'Refresh-unsynced-cooldown'. */
+    private final Map<Entity, Tuple<Integer, Color>> villagerCooldown = new HashMap<>();
+    /** How often an unsynced villager has been retried in a row, see 'refresh-unsynced-cooldown'. */
     private final Map<Entity, Integer> refreshCount = new HashMap<>();
     /** Scratch list for the movement check, so no list is allocated every tick. */
     private final List<Entity> movementCheckTargets = new ArrayList<>();
 
     private int ticker = 0;
-    private int ticker_close = 0;
+    private int tickerClose = 0;
     private boolean pendingClose = false;
 
     /** Used by the inventory manager for its debug output. */
     public boolean isDebug() {
-        return Debug.get();
+        return debug.get();
     }
 
     private int countItemInInventory(Item item) {
@@ -597,10 +660,10 @@ public class TradeAura extends Module {
     @Override
     public void onActivate() {
         targets.clear();
-        VillagerCooldown.clear();
+        villagerCooldown.clear();
         refreshCount.clear();
         ticker = 0;
-        ticker_close = 0;
+        tickerClose = 0;
         pendingClose = false;
 
         invManager.reset();
@@ -615,10 +678,10 @@ public class TradeAura extends Module {
         }
 
         targets.clear();
-        VillagerCooldown.clear();
+        villagerCooldown.clear();
         refreshCount.clear();
         ticker = 0;
-        ticker_close = 0;
+        tickerClose = 0;
         pendingClose = false;
 
         invManager.reset();
@@ -628,7 +691,7 @@ public class TradeAura extends Module {
     @EventHandler
     private void onOpenScreen(OpenScreenEvent event) {
         if (event.screen instanceof MerchantScreen) {
-            if (CancelEvent.get()) event.cancel();
+            if (cancelEvent.get()) event.cancel();
             return;
         }
 
@@ -654,10 +717,10 @@ public class TradeAura extends Module {
     private Entity remember_entity;
 
     private void updateColor(Color clr) {
-        if (VillagerCooldown.containsKey(remember_entity)) {
-            Tuple<Integer, Color> newPair = VillagerCooldown.get(remember_entity);
+        if (villagerCooldown.containsKey(remember_entity)) {
+            Tuple<Integer, Color> newPair = villagerCooldown.get(remember_entity);
             newPair.setB(clr);
-            VillagerCooldown.replace(remember_entity, newPair);
+            villagerCooldown.replace(remember_entity, newPair);
 
             // The villager answered, so it is not "unsynced" anymore.
             if (!clr.equals(defaultColor.get())) refreshCount.remove(remember_entity);
@@ -697,16 +760,16 @@ public class TradeAura extends Module {
                     if (sellRule == null) continue;
 
                     if (sellRule.value1 != -1 && payItem.getCount() > sellRule.value1) {
-                        if (Debug.get())
+                        if (debug.get())
                             info(payItem.getHoverName().getString() + " sell quantity too high: " + payItem.getCount() + " > " + sellRule.value1);
-                        updateColor(TooExpensiveColor.get());
+                        updateColor(tooExpensiveColor.get());
                         continue;
                     }
 
                     if (sellRule.value2 != -1) {
                         int emeraldCount = countItemInInventory(Items.EMERALD);
                         if (emeraldCount >= sellRule.value2) {
-                            if (Debug.get())
+                            if (debug.get())
                                 info("Emerald limit reached for " + payItem.getHoverName().getString() + ": " + emeraldCount + "/" + sellRule.value2);
                             updateColor(limitReachedColor.get());
                             continue;
@@ -715,7 +778,7 @@ public class TradeAura extends Module {
 
                     int availableCount = countItemInInventory(payItem.getItem());
                     if (availableCount < payItem.getCount()) {
-                        if (Debug.get())
+                        if (debug.get())
                             info("Not enough " + payItem.getHoverName().getString() + " to sell (have " + availableCount + ", need " + payItem.getCount() + ")");
                         updateColor(noSellItemsColor.get()); 
                         continue;
@@ -726,7 +789,7 @@ public class TradeAura extends Module {
                         continue;
                     }
 
-                    if (Debug.get()) info("SELLING " + payItem.getHoverName().getString());
+                    if (debug.get()) info("SELLING " + payItem.getHoverName().getString());
 
                     mc.player.connection.send(new ServerboundSelectTradePacket(num));
                     InvUtils.shiftClick().slotId(2);
@@ -743,32 +806,32 @@ public class TradeAura extends Module {
                 }
 
                 if (buyRule != null) {
-                    
-					FindItemResult resultEm = InvUtils.find(Items.EMERALD);
-					if (!resultEm.found()) {
-						if (Debug.get()) info("no emeralds");
-						updateColor(noEmeraldColor.get());
-						continue;
-					}
-					
-					if (payItem.is(Items.EMERALD) && payItem.getCount() > buyRule.value1) {
-                        if (Debug.get())
+
+                    FindItemResult resultEm = InvUtils.find(Items.EMERALD);
+                    if (!resultEm.found()) {
+                        if (debug.get()) info("no emeralds");
+                        updateColor(noEmeraldColor.get());
+                        continue;
+                    }
+
+                    if (payItem.is(Items.EMERALD) && payItem.getCount() > buyRule.value1) {
+                        if (debug.get())
                             info(offer.getResult().getHoverName().getString() + " too expensive " + payItem.getCount());
-                        updateColor(TooExpensiveColor.get());
+                        updateColor(tooExpensiveColor.get());
                         continue;
                     }
 
                     if (buyRule.value2 != -1) {
                         int currentCount = countItemInInventory(sellItem.getItem());
                         if (currentCount >= buyRule.value2) {
-                            if (Debug.get())
+                            if (debug.get())
                                 info(sellItem.getHoverName().getString() + " limit reached: " + currentCount + "/" + buyRule.value2);
                             updateColor(limitReachedColor.get());
                             continue;
                         }
                     }
 
-                    if (Debug.get()) {
+                    if (debug.get()) {
                         info("BUYING " + sellItem.getHoverName().getString());
                     }
 
@@ -785,7 +848,7 @@ public class TradeAura extends Module {
 
             if (tradeHappened) updateColor(yesPurchase.get());
 
-            ticker_close = 0;
+            tickerClose = 0;
             pendingClose = true;
 
         }
@@ -823,7 +886,7 @@ public class TradeAura extends Module {
         EntityHitResult entityHitResult = ProjectileUtil.getEntityHitResult(mc.player, playerPos, villagerPos, villager.getBoundingBox(), Entity::isPickable, playerPos.distanceToSqr(villagerPos));
 
         if (entityHitResult == null) {
-            if (Debug.get()) info("Raycast didn't find a target");
+            if (debug.get()) info("Raycast didn't find a target");
             interactWith(villager, hitResultFor(villager));
             return;
         }
@@ -832,7 +895,7 @@ public class TradeAura extends Module {
 
         InteractionResult actionResult = interactWith(villager, entityHitResult);
         if (!actionResult.consumesAction()) {
-            if (Debug.get()) info("Action wasn't accepted");
+            if (debug.get()) info("Action wasn't accepted");
             interactWith(villager, hitResultFor(villager));
         }
     }
@@ -855,7 +918,7 @@ public class TradeAura extends Module {
         TargetUtils.getList(movementCheckTargets, this::entityCheck, priority.get(), maxTargets.get());
 
         for (Entity target : movementCheckTargets) {
-            if (VillagerCooldown.containsKey(target)) continue;
+            if (villagerCooldown.containsKey(target)) continue;
             if (shouldSkipVillager(target)) continue;
 
             return true;
@@ -869,7 +932,7 @@ public class TradeAura extends Module {
      * <p>
      * The lock only ever engages while there is a villager the aura would actually click - freezing the player
      * in an empty field is never useful. On top of that either the countdown window
-     * ({@code Ticks-to-cancel-movement}) or {@code Cancel-movement-near-villager} has to ask for it.
+     * ({@code ticks-to-cancel-movement}) or {@code cancel-movement-near-villager} has to ask for it.
      */
     private void updateMovementLock() {
         if (mc.player == null || !aura.get() || !cancelMovement.get()) {
@@ -882,8 +945,8 @@ public class TradeAura extends Module {
             return;
         }
 
-        int ticksRemaining = ticks_to_wait.get() - ticker;
-        boolean interactionClose = ticksRemaining >= 0 && ticksRemaining <= ticks_to_cancel_movement.get();
+        int ticksRemaining = ticksToWait.get() - ticker;
+        boolean interactionClose = ticksRemaining >= 0 && ticksRemaining <= ticksToCancelMovement.get();
 
         if (cancelMovementNearVillager.get() || interactionClose) MovementControl.freeze();
         else MovementControl.stop();
@@ -893,25 +956,23 @@ public class TradeAura extends Module {
     private boolean shouldSkipVillager(Entity target) {
         if (!(target instanceof Villager villager)) return false;
 
+        // TODO: read the real profession from the villager's VillagerData. Until then "any" lets every
+        //  profession through the pre-check, and the trade list decides once the screen is open.
         String professionName = "any";
-		
-		/**
-		idk how to get the proffession, reflection doesn't seem to work. (btw, WHY is that still a thing?..)
-		*/
-		
+
         boolean anyValidTrade = false;
 
         // 1. Check SELL rules (we sell to the villager)
         for (TradeRule rule : sellRules) {
             boolean sellLimitOk = rule.value2 == -1 || countItemInInventory(Items.EMERALD) < rule.value2;
-            
+
             for (Item item : rule.items) {
                 if (!TradeData.VILLAGER_BUYS.containsKey(item)) {
                     anyValidTrade = true; // Unhardcoded item, allow click to check
                     break;
                 }
                 boolean correctProfession = TradeData.VILLAGER_BUYS.get(item).contains(professionName) || professionName.equals("any");
-                
+
                 if (correctProfession && sellLimitOk) {
                     anyValidTrade = true; // Found a valid trade!
                     break;
@@ -931,7 +992,7 @@ public class TradeAura extends Module {
                 }
                 boolean correctProfession = TradeData.VILLAGER_SELLS.get(item).contains(professionName) || professionName.equals("any");
                 boolean buyLimitOk = rule.value2 == -1 || countItemInInventory(item) < rule.value2;
-                
+
                 if (correctProfession && buyLimitOk) {
                     anyValidTrade = true; // Found a valid trade!
                     break;
@@ -951,7 +1012,7 @@ public class TradeAura extends Module {
     private boolean shouldRefreshCooldown(Entity target) {
         if (!refreshUnsynced.get()) return false;
 
-        Tuple<Integer, Color> entry = VillagerCooldown.get(target);
+        Tuple<Integer, Color> entry = villagerCooldown.get(target);
         if (entry == null) return false;
         if (!entry.getB().equals(defaultColor.get())) return false;
         if (entry.getA() < refreshDelay.get()) return false;
@@ -960,7 +1021,7 @@ public class TradeAura extends Module {
         if (tries >= maxRefreshes.get()) return false;
 
         refreshCount.put(target, tries + 1);
-        if (Debug.get()) info("Villager never synced, forcing a cooldown refresh (try " + (tries + 1) + "/" + maxRefreshes.get() + ")");
+        if (debug.get()) info("Villager never synced, forcing a cooldown refresh (try " + (tries + 1) + "/" + maxRefreshes.get() + ")");
         return true;
     }
 
@@ -972,7 +1033,7 @@ public class TradeAura extends Module {
         // Inventory manipulation always wins: while an action runs the aura stands down completely.
         if (aura.get() && invManager.tick()) {
             ticker = 0;
-            ticker_close = 0;
+            tickerClose = 0;
             pendingClose = false;
             return;
         }
@@ -982,15 +1043,15 @@ public class TradeAura extends Module {
         // Called on every tick: the lock has to be re-applied (and released) continuously.
         updateMovementLock();
 
-        if (ticker < ticks_to_wait.get()) return;
+        if (ticker < ticksToWait.get()) return;
         ticker = 0;
 
         if (mc.player.containerMenu instanceof MerchantMenu) {
-            if (!Close.get()) return;
+            if (!close.get()) return;
             if (!pendingClose) return;
 
-            if (++ticker_close < ticks_to_close.get()) return;
-            ticker_close = 0;
+            if (++tickerClose < ticksToClose.get()) return;
+            tickerClose = 0;
             pendingClose = false;
             InvHelper.closeScreen();
             mc.player.getInventory().tick();
@@ -1002,39 +1063,39 @@ public class TradeAura extends Module {
         TargetUtils.getList(targets, this::entityCheck, priority.get(), maxTargets.get());
 
         for (Entity targett : targets) {
-            if (VillagerCooldown.containsKey(targett)) {
+            if (villagerCooldown.containsKey(targett)) {
                 if (!shouldRefreshCooldown(targett)) continue;
-                VillagerCooldown.remove(targett);
+                villagerCooldown.remove(targett);
             }
 
             if (shouldSkipVillager(targett)) {
-                if (Debug.get()) info("Skipped villager (pre-check: no valid trades possible).");
-                VillagerCooldown.put(targett, new Tuple<>(0, limitReachedColor.get()));
+                if (debug.get()) info("Skipped villager (pre-check: no valid trades possible).");
+                villagerCooldown.put(targett, new Tuple<>(0, limitReachedColor.get()));
                 continue;
             }
 
             remember_entity = targett;
-            VillagerCooldown.put(targett, new Tuple<>(0, defaultColor.get()));
+            villagerCooldown.put(targett, new Tuple<>(0, defaultColor.get()));
             if (rotateToVillager.get()) {
                 VillagerInteract(targett);
             } else {
-                if (Debug.get()) info("Rotation disabled, interacting without rotating.");
+                if (debug.get()) info("Rotation disabled, interacting without rotating.");
                 InteractionResult actionResult = interactWith(targett, hitResultFor(targett));
-                if (!actionResult.consumesAction() && Debug.get()) {
+                if (!actionResult.consumesAction() && debug.get()) {
                     info("Aura interaction was not accepted.");
                 }
             }
             break;
         }
 
-        for (Map.Entry<Entity, Tuple<Integer, Color>> e : new HashMap<>(VillagerCooldown).entrySet()) {
+        for (Map.Entry<Entity, Tuple<Integer, Color>> e : new HashMap<>(villagerCooldown).entrySet()) {
             int time = e.getValue().getA();
             Color clr = e.getValue().getB();
             if (time > forget.get()) {
-                VillagerCooldown.remove(e.getKey());
+                villagerCooldown.remove(e.getKey());
                 refreshCount.remove(e.getKey());
             } else {
-                VillagerCooldown.replace(e.getKey(), new Tuple<>(time + 1, clr));
+                villagerCooldown.replace(e.getKey(), new Tuple<>(time + 1, clr));
             }
         }
     }
@@ -1043,7 +1104,7 @@ public class TradeAura extends Module {
     private void onRender3D(Render3DEvent event) {
         if (!render.get()) return;
 
-        for (Map.Entry<Entity, Tuple<Integer, Color>> e : new HashMap<>(VillagerCooldown).entrySet()) {
+        for (Map.Entry<Entity, Tuple<Integer, Color>> e : new HashMap<>(villagerCooldown).entrySet()) {
             Entity entity = e.getKey();
             drawBoundingBox(event, entity, e.getValue().getB());
         }

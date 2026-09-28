@@ -3,7 +3,7 @@
 ![Minecraft](https://img.shields.io/badge/minecraft-26.1.2%2B-brightgreen)
 ![Meteor Client](https://img.shields.io/badge/meteor--client-addon-blueviolet)
 
-<img src="src/main/resources/assets/icon.png" width="128" align="right" alt="TradeAura">
+<img src="src/main/resources/assets/trade-aura/icon.png" width="128" align="right" alt="TradeAura">
 
 Meteor addon that automates villager trading - buys and sells against rules you set, and can keep
 your inventory itself tidy (drop, compress/decompress emeralds, dump to and refill from a shulker)
@@ -45,12 +45,12 @@ while it works. Includes manual auto trade (trade is completed automatically aft
    its price/quantity limits (buy: max emerald price + inventory cap; sell: max sell quantity +
    emerald cap). A limit of `-1` means unlimited.
 2. Turn the module on:
-   - Click a villager manually, or enable **Villager-Aura** (Aura group) to have it click villagers
+   - Click a villager manually, or enable **villager-aura** (Aura group) to have it click villagers
      in range for you.
-   - Trades matching a rule complete automatically; the trade screen closes itself if **Close** is on.
+   - Trades matching a rule complete automatically; the trade screen closes itself if **close** is on.
 3. Optionally configure **Inventory manipulation** (its own settings group) to keep excess items,
    emeralds, and shulker contents in check automatically between trades.
-4. Enable **Render** (Render group) if you want a visual overlay explaining what the aura is doing
+4. Enable **render** (Render group) if you want a visual overlay explaining what the aura is doing
    with each villager.
 
 ### Settings
@@ -59,10 +59,10 @@ Settings are split into four groups in the module GUI:
 
 | Group | Covers |
 | --- | --- |
-| General | `Close` / `Ticks-to-close` (auto-close the trade screen), `Cancel-Event` (suppress the trade GUI popping open), `Debug` (verbose chat logging). Buy/Sell rules themselves are edited as tables in the module GUI, not as individual settings. |
-| Aura | Enable/tune `Villager-Aura`: click timing, rotation, range, target priority/limits, movement lock while a villager is in range, and recovery for villagers that never sync their trade offers. |
+| General | `close` / `ticks-to-close` (auto-close the trade screen), `cancel-event` (suppress the trade GUI popping open), `debug` (verbose chat logging). Buy/Sell rules themselves are edited as tables in the module GUI, not as individual settings. |
+| Aura | Enable/tune `villager-aura`: click timing, rotation, range, target priority/limits, movement lock while a villager is in range, and recovery for villagers that never sync their trade offers. |
 | Inventory manipulation | Independent toggles for dropping excess items, compressing/decompressing emeralds (+ glass panes), dumping to and refilling from a shulker - each with its own trigger/leave thresholds and per-item rule tables, plus shared settings for action pacing and shulker handling. |
-| Render | `Render` toggle plus opacity and one color per outcome (no emeralds, no sellable items, no trades, on cooldown, too expensive, limit reached, successful purchase). |
+| Render | `render` toggle plus opacity and one color per outcome (no emeralds, no sellable items, no trades, on cooldown, too expensive, limit reached, successful purchase). |
 
 ### Showcase
 
@@ -76,7 +76,6 @@ https://github.com/user-attachments/assets/7e2bc3a1-4222-4728-956b-aa308c9296ab
 ./gradlew runInstance          # ...on your own PrismLauncher instance instead
 ./gradlew deploy               # build a jar, swap it into the PrismLauncher instance, restart
 ./gradlew runInstance -Pdebug  # suspend the game until a debugger attaches (F5 does this)
-./gradlew buildArchive         # build a jar, also put a copy into releases/ folder
 ./gradlew tasks --group addon  # everything above, from Gradle itself
 ```
 
@@ -95,13 +94,17 @@ https://github.com/user-attachments/assets/7e2bc3a1-4222-4728-956b-aa308c9296ab
 | 7 commits past `v1.2.3` | `...-1.2.4-dev.7+26.1.2.jar` |
 | ...with uncommitted changes | `...-1.2.4-dev.7d+26.1.2.jar` |
 
-Releasing is `git tag v1.2.3` and building.
+Releasing: `git tag -a v1.2.3`, then `git push --follow-tags`. GitHub Actions builds the jar
+and attaches it to a new release. Only `vX.Y.Z` tags count - older names such as `26.1.2.f` are ignored.
 
 
-`gradle.properties`, which is the single source of truth read by
-`settings.gradle.kts`, `build.gradle.kts` and (through `processResources`)
-`fabric.mod.json`. `BuildConfig.java` is generated from it too, so the mod
-name, category and repo are never written down twice.
+### Metadata
+
+`gradle.properties` is the single source of truth. `fabric.mod.json` and `meteor-addon-list.json`
+(read by [meteoraddons.com](https://meteoraddons.com)) are generated from it by every build and
+committed, so anything reading the repository sees real values - edit `gradle.properties`, never
+those two files. `BuildConfig.java` is generated from it too, so the mod name, category and repo are
+never written down twice.
 
 
 ## License

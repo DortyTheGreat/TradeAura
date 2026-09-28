@@ -1,3 +1,21 @@
+/*
+ * TradeAura - Meteor Client addon for automated villager trading.
+ * Copyright (C) 2026 DortyTheGreat
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
+
 package com.TradeAura.addon.inventory;
 
 import com.TradeAura.addon.modules.TradeAura;
@@ -21,7 +39,7 @@ import static meteordevelopment.meteorclient.MeteorClient.mc;
  * blocks -> few blocks -> refill blocks from the shulker" case from the spec falls out of that automatically.
  * <p>
  * Because a chain can also be an infinite loop when two triggers undo each other, the number of actions that run
- * back to back is capped by {@code Max-chained-actions}; hitting the cap pauses the whole tab for a while and
+ * back to back is capped by {@code max-chained-actions}; hitting the cap pauses the whole tab for a while and
  * prints what the conflict most likely is.
  */
 public class InventoryManager {
@@ -335,7 +353,7 @@ public class InventoryManager {
         if (!s.enabled.get()) return;
 
         if (s.compressEnabled.get() && s.decompressEnabled.get() && s.compressLeave.get() < s.decompressTrigger.get()) {
-            warn("Compress-leave (" + s.compressLeave.get() + ") is below Decompress-trigger (" + s.decompressTrigger.get() + "), those two will undo each other.");
+            warn("compress-leave (" + s.compressLeave.get() + ") is below decompress-trigger (" + s.decompressTrigger.get() + "), those two will undo each other.");
         }
 
         if (s.dumpEnabled.get() && s.refillEnabled.get()) {

@@ -10,6 +10,10 @@ plugins {
 
 fun prop(key: String) = properties[key] as String
 
+/** An optional comma-separated property as a list, blanks dropped. Missing or empty -> empty list. */
+fun listProp(key: String): List<String> =
+    (properties[key] as String?).orEmpty().split(",").map { it.trim() }.filter { it.isNotEmpty() }
+
 /** The repo url is derived, so owner and name only exist once. */
 val repoUrl = "https://github.com/${prop("github_owner")}/${prop("github_repo")}"
 
@@ -17,19 +21,19 @@ val repoUrl = "https://github.com/${prop("github_owner")}/${prop("github_repo")}
 /**
  * Version comes from GIT, not from a counter in a committed file.
  *
- * A hand-maintained counter conflicts on every merge, has to be bumped
- * before Gradle even starts (which is why the old code mutated
- * version.properties at configuration time), and says nothing about what
- * is actually in the build. A tag plus a commit count says both.
+ * A hand-maintained counter conflicts on every merge and says nothing about
+ * what is actually in the build. A tag plus a commit count says both.
  *
- *   on an exact tag, clean tree ->  1.2.3+mc26.1.2
- *   7 commits past v1.2.3        ->  1.2.4-dev.7+abc1234
- *   ...with uncommitted changes  ->  1.2.4-dev.7+abc1234.dirty
+ * Only tags shaped vX.Y.Z count. Anything else - old release names like
+ * 26.1.2.f, "latest", "snapshot" - is ignored, because `git describe` would
+ * otherwise happily base the version on it and produce 1.21.5.21.11b-dev.0.
  *
- * SemVer orders these correctly: 1.2.4-dev.7 sorts BELOW 1.2.4, which is
- * right - it is on the way there, not there yet. Hence the patch bump:
+ * SemVer orders the results correctly: 1.2.4-dev.7 sorts BELOW 1.2.4, which
+ * is right - it is on the way there, not there yet. Hence the patch bump:
  * naming it 1.2.3-dev.7 would sort it below the tag it comes after.
  */
+val releaseTagPattern = "v[0-9]*"
+
 fun git(vararg args: String): String? = try {
     val p = ProcessBuilder(listOf("git") + args)
         .directory(rootDir).redirectErrorStream(false).start()
@@ -46,9 +50,13 @@ fun bumpPatch(v: String): String {
     return parts.joinToString(".")
 }
 
-val gitExactTag = git("describe", "--tags", "--exact-match", "HEAD")?.removePrefix("v")
-val gitLastTag = git("describe", "--tags", "--abbrev=0")?.removePrefix("v")
-val gitCommitsSinceTag = git("rev-list", "--count", "HEAD", "^${gitLastTag?.let { "v$it" } ?: "HEAD"}")
+val gitExactTag = git("describe", "--tags", "--exact-match", "--match", releaseTagPattern, "HEAD")?.removePrefix("v")
+val gitLastTag = git("describe", "--tags", "--abbrev=0", "--match", releaseTagPattern)?.removePrefix("v")
+val gitCommitsSinceTag = if (gitLastTag != null) {
+    git("rev-list", "--count", "v$gitLastTag..HEAD")
+} else {
+    git("rev-list", "--count", "HEAD")
+}
 val gitHash = git("rev-parse", "--short", "HEAD")
 val gitDirty = !git("status", "--porcelain").isNullOrEmpty()
 
@@ -75,7 +83,7 @@ val gitVersion: String = when {
     gitExactTag != null && !gitDirty ->
         "$gitExactTag+${prop("minecraft_version")}"
     else -> {
-        // No tags yet means the first release is still ahead, so count up
+        // No release tag yet means the first release is still ahead, so count up
         // from 0.0.0 - the bump makes that 0.0.1-dev.N, which is correct:
         // below any tag anyone will ever make.
         val base = bumpPatch(gitLastTag ?: "0.0.0")
@@ -86,7 +94,7 @@ val gitVersion: String = when {
 }
 
 /**
- * A release is an exact tag on a clean tree. Everything else is a dev build.
+ * A release is an exact vX.Y.Z tag on a clean tree. Everything else is a dev build.
  *
  * No version.properties, no -PbuildType: whether this is a release is a fact
  * about the repository, not a flag somebody remembers to pass. Passing a flag
@@ -95,7 +103,7 @@ val gitVersion: String = when {
  */
 val isRelease = gitExactTag != null && !gitDirty
 
-val modVersion = gitVersion!!
+val modVersion = gitVersion
 
 /**
  * The coloured suffix in Fabric's mod list. Dev builds only - a release should
@@ -207,33 +215,146 @@ val generateBuildConfig by tasks.registering {
 
 sourceSets.main.get().java.srcDir(generateBuildConfig)
 
+
+// =====================================================================
+//  MOD METADATA
+//
+//  gradle.properties is the only place these values are edited. Two
+//  committed files are generated from it:
+//
+//      src/main/resources/fabric.mod.json
+//      meteor-addon-list.json              (read by meteoraddons.com)
+//
+//  They are committed, and hold real values rather than ${...}
+//  placeholders, because tools read them straight from the repository
+//  without running Gradle - that is how meteoraddons.com ended up listing
+//  "${mod_name}" by "${mod_author}" with zero modules. Only "version"
+//  stays a placeholder: it comes from git and processResources fills it in.
+//
+//  syncModMetadata rewrites both files before every build, so locally
+//  they are never stale - commit them together with gradle.properties.
+//  On CI (CI=true) it only compares, and fails the build if they drifted.
+// =====================================================================
+
+/** Minimal deterministic JSON writer: 2-space indent, keys in insertion order. */
+fun toJson(value: Any?, indent: String = ""): String = when (value) {
+    null -> "null"
+    is String -> "\"" + value
+        .replace("\\", "\\\\")
+        .replace("\"", "\\\"")
+        .replace("\n", "\\n")
+        .replace("\r", "\\r")
+        .replace("\t", "\\t") + "\""
+    is Number, is Boolean -> value.toString()
+    is Map<*, *> ->
+        if (value.isEmpty()) "{}"
+        else value.entries.joinToString(",\n", "{\n", "\n$indent}") {
+            "$indent  " + toJson(it.key.toString()) + ": " + toJson(it.value, "$indent  ")
+        }
+    is List<*> ->
+        if (value.isEmpty()) "[]"
+        else value.joinToString(",\n", "[\n", "\n$indent]") { "$indent  " + toJson(it, "$indent  ") }
+    else -> error("toJson: cannot write $value")
+}
+
+val modIcon = "assets/${prop("mod_id")}/icon.png"
+
+val fabricModJson = linkedMapOf<String, Any?>(
+    "schemaVersion" to 1,
+    "id" to prop("mod_id"),
+    // The one value only known at build time (git) - filled in by processResources.
+    "version" to "\${version}",
+    "name" to prop("mod_name"),
+    "description" to prop("mod_description"),
+    "authors" to listOf(prop("mod_author")),
+    "contact" to linkedMapOf("sources" to repoUrl, "issues" to "$repoUrl/issues"),
+    "license" to "GPL-3.0-or-later",
+    "icon" to modIcon,
+    "environment" to "client",
+    "entrypoints" to linkedMapOf("meteor" to listOf("${prop("mod_package")}.Addon")),
+    "mixins" to listProp("mod_mixins"),
+    "custom" to linkedMapOf(
+        "meteor-client:color" to prop("mod_color"),
+        "modmenu" to linkedMapOf("parent" to linkedMapOf("id" to "meteor-client")),
+    ),
+    "depends" to linkedMapOf(
+        "java" to ">=${prop("jdk_version")}",
+        "minecraft" to minecraftDepends,
+        "meteor-client" to "*",
+    ),
+)
+
+/** What meteoraddons.com understands. Anything else it drops silently - so it fails the build here. */
+val addonListTags = setOf(
+    "PvP", "Utility", "Theme", "Render", "Movement", "Building",
+    "World", "Misc", "QoL", "Exploit", "Fun", "Automation",
+)
+val addonListVersionRegex = Regex("""^(1\.\d+(\.\d+)?|\d{2}\.\d+(\.\d+)?)$""")
+
+val supportedVersions = listProp("supported_versions").ifEmpty { listOf(prop("minecraft_version")) }
+val addonTags = listProp("addon_tags")
+
+supportedVersions.filterNot { addonListVersionRegex.matches(it) }.let { bad ->
+    require(bad.isEmpty()) {
+        "supported_versions: $bad - list exact versions such as 1.21.4, one by one; ranges are not understood."
+    }
+}
+addonTags.filterNot { it in addonListTags }.let { bad ->
+    require(bad.isEmpty()) { "addon_tags: $bad - allowed: ${addonListTags.joinToString()}" }
+}
+if (supportedVersions.size >= 15) {
+    logger.warn("supported_versions has ${supportedVersions.size} entries - meteoraddons.com flags 15+ as suspicious.")
+}
+
+val addonListJson = linkedMapOf<String, Any?>(
+    "description" to prop("mod_description"),
+    "tags" to addonTags,
+    "supported_versions" to supportedVersions,
+)
+
+val metadataFiles = mapOf(
+    file("src/main/resources/fabric.mod.json") to toJson(fabricModJson) + "\n",
+    file("meteor-addon-list.json") to toJson(addonListJson) + "\n",
+)
+
+val syncModMetadata by tasks.registering {
+    group = "addon"
+    description = "Regenerate fabric.mod.json and meteor-addon-list.json from gradle.properties (on CI: only verify)."
+
+    doLast {
+        val stale = metadataFiles.filter { (target, text) ->
+            !target.exists() || target.readText().replace("\r\n", "\n") != text
+        }
+        if (stale.isEmpty()) return@doLast
+
+        val names = stale.keys.joinToString { it.relativeTo(projectDir).invariantSeparatorsPath }
+        if (System.getenv("CI") != null) {
+            throw GradleException(
+                "$names out of date with gradle.properties - run ./gradlew syncModMetadata and commit the result.")
+        }
+
+        stale.forEach { (target, text) -> target.writeText(text) }
+        logger.lifecycle("Regenerated $names from gradle.properties - commit it together with gradle.properties.")
+    }
+}
+
 tasks {
     processResources {
-        // Explicit UTF-8 for the token expansion below - Gradle can default this to the platform
-        // charset on Windows, which would mangle the § color code in display_name.
+        // Explicit UTF-8 - Gradle can default to the platform charset on Windows, which would
+        // mangle the § color codes of the dev name below.
         filteringCharset = "UTF-8"
+        dependsOn(syncModMetadata)
 
-        // Everything fabric.mod.json needs, straight out of gradle.properties.
-        val propertyMap = mapOf(
-            "mod_id" to prop("mod_id"),
-            "mod_name" to prop("mod_name"),
-            // Shown by Fabric's own mod list as "<name> by <author>" - sneaks the version letter
-            // in, colored, without touching the plain mod_name used everywhere else.
-            "display_name" to displayName,
-            "mod_description" to prop("mod_description"),
-            "mod_author" to prop("mod_author"),
-            "mod_package" to prop("mod_package"),
-            "mod_repo" to repoUrl,
-            "mod_color" to prop("mod_color"),
-            "version" to modVersion,
-            "minecraft_version" to prop("minecraft_version"),
-            "minecraft_depends" to minecraftDepends,
-            "jdk_version" to prop("jdk_version"),
-        )
+        val modName = prop("mod_name")
+        val expandProps = mapOf("version" to modVersion)
+        inputs.properties(expandProps)
+        inputs.property("displayName", displayName)
 
-        inputs.properties(propertyMap)
         filesMatching("fabric.mod.json") {
-            expand(propertyMap)
+            expand(expandProps)
+            // Dev builds are listed as "<name> dev.<hash>" in Fabric's mod list. The committed file
+            // keeps the plain name, so the repository always shows the real one.
+            filter { line -> line.replace("\"name\": \"$modName\"", "\"name\": \"$displayName\"") }
         }
     }
 
@@ -252,20 +373,15 @@ tasks {
 
 
 // =====================================================================
-//  BUILD / DEPLOY TASKS   (replaces test-addon-prism.bat)
+//  BUILD / DEPLOY TASKS
 //
-//      gradlew build           the jar, and nothing else
+//      gradlew build           the jar (build/libs), and nothing else
 //      gradlew deploy          ...plus swap it into the instance and restart
-//      gradlew buildArchive    ...plus copy it into releases/
 //
-//  There used to be a dev/release pair of each of these. Once the version
-//  came from git that distinction stopped existing: dev and release are the
-//  same build, differing only in whether HEAD happens to sit on a clean tag.
-//  Two names for one operation is just a way to pick the wrong one.
-//
-//  So what is left is the two things that actually differ - where the jar
-//  goes afterwards. Tag the commit (git tag -a v1.2.3) and the version
-//  follows; buildArchive warns if HEAD is not on a clean tag.
+//  Dev and release are the same build, differing only in whether HEAD sits
+//  on a clean vX.Y.Z tag. Tag the commit (git tag -a v1.2.3) and the version
+//  follows. Published jars are built by GitHub Actions from the tag, see
+//  .github/workflows/build.yml.
 //
 //  Machine-specific paths live in deploy.local.properties (gitignored):
 //      prism_instance=26.1.2 - meteor
@@ -328,31 +444,6 @@ fun runCommand(vararg args: String) {
     val p = ProcessBuilder(*args).redirectErrorStream(true).start()
     p.inputStream.bufferedReader().forEachLine { logger.lifecycle("    $it") }
     p.waitFor()
-}
-
-val buildArchive by tasks.registering {
-    group = "addon"
-    description = "Build and copy the jar into releases/."
-    dependsOn(tasks.jar)
-    doLast {
-        val jar = builtJar()
-        val releases = rootProject.file("releases").apply { mkdirs() }
-        jar.copyTo(File(releases, jar.name), overwrite = true)
-        logger.lifecycle("Built and archived releases/${jar.name}")
-
-        // Jars are small, but a releases/ folder that quietly grows into
-        // the repo is exactly the phase_v2 mistake in a different costume.
-        val mb = (releases.listFiles()?.sumOf { it.length() } ?: 0L) / 1048576
-        if (mb > 5) {
-            logger.warn("WARNING: releases/ is now ~$mb MB - trim old jars before committing.")
-        }
-        if (!isRelease) {
-            logger.warn("NOT a release build: HEAD is not on a clean tag, so this " +
-                        "jar is $modVersion. Tag it first (git tag -a v1.2.3) if " +
-                        "you meant to release.")
-        }
-        logger.lifecycle("Remember to add a CHANGELOG.md entry for $modVersion.")
-    }
 }
 
 /** Kill the running instance, swap the jar in, relaunch. */
@@ -503,4 +594,3 @@ if (hasProperty("debug")) {
     }
     logger.lifecycle("[debug] The game will wait for a debugger on port $port.")
 }
-

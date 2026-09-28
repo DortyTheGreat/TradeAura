@@ -1,0 +1,11 @@
+{
+  "description": "Meteor addon for automating villager trading",
+  "tags": [
+    "Automation"
+  ],
+  "supported_versions": [
+    "26.1.2",
+    "1.21.11",
+    "1.21.4"
+  ]
+}
