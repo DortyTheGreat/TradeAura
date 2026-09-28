@@ -28,9 +28,9 @@ while it works. Includes manual auto trade (trade is completed automatically aft
 
 | Minecraft Version | Addon Version |
 | --- | --- | 
-| 26.1.2+           | [26.1.2 (Latest)](https://github.com/DortyTheGreat/TradeAura/releases/latest) 
-| 1.21.4+           | [1.21.4](https://github.com/DortyTheGreat/TradeAura/releases/tag/1.21.4d)    
-| 1.21.11+          | [1.21.11](https://github.com/DortyTheGreat/TradeAura/releases/tag/1.21.11d)    
+| 26.1.2    | [26.1.2 (Latest)](https://github.com/DortyTheGreat/TradeAura/releases/latest) 
+| 1.21.11   | [1.21.11](https://github.com/DortyTheGreat/TradeAura/releases/tag/1.21.11d)    
+| 1.21.4    | [1.21.4](https://github.com/DortyTheGreat/TradeAura/releases/tag/1.21.4d)    
 
 > **Note**
 > * Only the latest Minecraft version receives feature updates. Older releases may not include the newest features.
