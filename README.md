@@ -5,7 +5,7 @@
 
 Meteor addon that automates villager trading - buys and sells against rules you set, and can keep
 your inventory itself tidy (drop, compress/decompress emeralds, dump to and refill from a shulker)
-while it works.
+while it works. Includes manual auto trade (trade is completed automatically after a manual interaction with villager) and villager-aura (autamatically clicks at villagers to perform trades)
 
 ### Features
 
@@ -23,6 +23,19 @@ while it works.
 
 - [Fabric Loader](https://fabricmc.net/use/)
 - [Meteor Client](https://meteorclient.com/)
+
+### Download
+
+| Minecraft Version | Addon Version |
+| --- | --- | 
+| 26.1.2+           | [26.1.2 (Latest)](https://github.com/DortyTheGreat/TradeAura/releases/latest) 
+| 1.21.4+           | [1.21.4](https://github.com/DortyTheGreat/TradeAura/releases/tag/1.21.4d)    
+| 1.21.11+          | [1.21.11](https://github.com/DortyTheGreat/TradeAura/releases/tag/1.21.11d)    
+
+> **Note**
+> * Only the latest Minecraft version receives feature updates. Older releases may not include the newest features.
+>   * TODO: This will probably be changed eventually and I will add support to multiple minecraft/meteor versions sometime in the future
+> * Releases are generally **forward-compatible**, meaning each Addon version is expected to work on multiple newer Minecraft versions. However, this compatibility is not guaranteed indefinitely and may eventually break.
 
 ### Usage
 
@@ -53,17 +66,41 @@ Settings are split into four groups in the module GUI:
 
 https://github.com/user-attachments/assets/7e2bc3a1-4222-4728-956b-aa308c9296ab
 
-### Building
+### Building and running the game
 
-**Quick way (recommended):** `test-addon-prism.bat [-dev|-release]` (defaults to `-dev`). Builds,
-kills and relaunches a configured PrismLauncher instance with the fresh jar deployed to its mods
-folder; `-release` also prompts to confirm the version letter and archives the jar into `releases/`.
-One-time setup: copy `deploy-prism.local.bat.example` to `deploy-prism.local.bat` and fill in your
-paths (gitignored - every dev points it at their own instance).
+```sh
+./gradlew build                # build/libs/<name>-<version>.jar
+./gradlew runClient            # launch with the mod loaded, empty run/ folder
+./gradlew runInstance          # ...on your own PrismLauncher instance instead
+./gradlew deploy               # build a jar, swap it into the PrismLauncher instance, restart
+./gradlew runInstance -Pdebug  # suspend the game until a debugger attaches (F5 does this)
+./gradlew buildArchive         # build a jar, also put a copy into releases/ folder
+./gradlew tasks --group addon  # everything above, from Gradle itself
+```
 
-**Plain Gradle:** `gradlew.bat jar` (or `build`) works too - the jar lands in `build/libs/`. The
-version string comes from `version.properties`; pass `-PbuildType=release` to drop the `-dev.N`
-suffix, otherwise it's a dev build by default.
+`runInstance` and `deploy` need `deploy.local.properties` - copy
+`deploy.local.properties.example` and fill in your PrismLauncher paths.
+
+
+### Version numbering
+
+`AddonName-<mod_version>+<minecraft_version>.jar`, derived from
+**git** so nothing is bumped by hand:
+
+| situation | jar |
+|---|---|
+| on an exact tag, clean tree | `...-1.2.3+26.1.2.jar` |
+| 7 commits past `v1.2.3` | `...-1.2.4-dev.7+26.1.2.jar` |
+| ...with uncommitted changes | `...-1.2.4-dev.7d+26.1.2.jar` |
+
+Releasing is `git tag v1.2.3` and building.
+
+
+`gradle.properties`, which is the single source of truth read by
+`settings.gradle.kts`, `build.gradle.kts` and (through `processResources`)
+`fabric.mod.json`. `BuildConfig.java` is generated from it too, so the mod
+name, category and repo are never written down twice.
+
 
 ## License
 
