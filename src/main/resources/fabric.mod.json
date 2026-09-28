@@ -12,7 +12,7 @@
     "issues": "${mod_repo}/issues"
   },
   "license": "GPL-3.0-or-later",
-  "icon": "assets/template/icon.png",
+  "icon": "assets/icon.png",
   "environment": "client",
   "entrypoints": {
     "meteor": [
