@@ -3,11 +3,11 @@
 ![Minecraft](https://img.shields.io/badge/minecraft-26.1.2%2B-brightgreen)
 ![Meteor Client](https://img.shields.io/badge/meteor--client-addon-blueviolet)
 
-<img src="src/main/resources/assets/icon.png" width="64" style="float: right;" alt="TradeAura">
+<img src="src/main/resources/assets/icon.png" width="128" align="right" alt="TradeAura">
 
 Meteor addon that automates villager trading - buys and sells against rules you set, and can keep
 your inventory itself tidy (drop, compress/decompress emeralds, dump to and refill from a shulker)
-while it works. Includes manual auto trade (trade is completed automatically after a manual interaction with villager) and villager-aura (autamatically clicks at villagers to perform trades)
+while it works. Includes manual auto trade (trade is completed automatically after a manual interaction with villager) and villager-aura (automatically clicks at villagers to perform trades)
 
 ### Features
 
