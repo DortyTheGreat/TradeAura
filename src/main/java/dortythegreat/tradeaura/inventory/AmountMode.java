@@ -16,7 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-package com.TradeAura.addon.inventory;
+package dortythegreat.tradeaura.inventory;
 
 /**
  * How the amount a trigger has to move is calculated.

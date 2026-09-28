@@ -16,7 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-package com.TradeAura.addon.inventory;
+package dortythegreat.tradeaura.inventory;
 
 /**
  * Base class of every inventory action.

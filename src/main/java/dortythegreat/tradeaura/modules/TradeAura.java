@@ -16,13 +16,13 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-package com.TradeAura.addon.modules;
+package dortythegreat.tradeaura.modules;
 
-import com.TradeAura.addon.inventory.InvHelper;
-import com.TradeAura.addon.inventory.MovementControl;
-import com.TradeAura.addon.inventory.InventoryManager;
-import com.TradeAura.addon.inventory.InventorySettings;
-import com.TradeAura.addon.inventory.ItemRule;
+import dortythegreat.tradeaura.inventory.InvHelper;
+import dortythegreat.tradeaura.inventory.MovementControl;
+import dortythegreat.tradeaura.inventory.InventoryManager;
+import dortythegreat.tradeaura.inventory.InventorySettings;
+import dortythegreat.tradeaura.inventory.ItemRule;
 
 import meteordevelopment.meteorclient.events.game.OpenScreenEvent;
 import meteordevelopment.meteorclient.events.packets.PacketEvent;

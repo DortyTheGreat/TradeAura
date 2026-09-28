@@ -16,7 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-package com.TradeAura.addon.modules;
+package dortythegreat.tradeaura.modules;
 
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;

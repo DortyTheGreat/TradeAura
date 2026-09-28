@@ -13,3 +13,5 @@ and are listed on the [Releases page](https://github.com/DortyTheGreat/TradeAura
 - Debug messages no longer break on item names containing `%`.
 - Release jars are built by GitHub Actions for every `vX.Y.Z` tag instead of being committed to the repository.
 - The `buildArchive` task and the `releases/` folder are gone - `./gradlew build` puts the jar in `build/libs`.
+- Java package renamed from `com.TradeAura.addon` to `dortythegreat.tradeaura`. Saved configs are keyed by
+  module name, so nothing changes for players.

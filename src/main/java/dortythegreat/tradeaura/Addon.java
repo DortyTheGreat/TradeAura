@@ -16,9 +16,9 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-package com.TradeAura.addon;
+package dortythegreat.tradeaura;
 
-import com.TradeAura.addon.modules.TradeAura;
+import dortythegreat.tradeaura.modules.TradeAura;
 import com.mojang.logging.LogUtils;
 import meteordevelopment.meteorclient.addons.GithubRepo;
 import meteordevelopment.meteorclient.addons.MeteorAddon;

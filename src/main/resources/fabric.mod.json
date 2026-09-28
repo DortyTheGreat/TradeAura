@@ -16,7 +16,7 @@
   "environment": "client",
   "entrypoints": {
     "meteor": [
-      "com.TradeAura.addon.Addon"
+      "dortythegreat.tradeaura.Addon"
     ]
   },
   "mixins": [],

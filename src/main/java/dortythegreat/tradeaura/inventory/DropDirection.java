@@ -16,7 +16,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-package com.TradeAura.addon.inventory;
+package dortythegreat.tradeaura.inventory;
 
 /**
  * Drop direction, relative to the player (not to the world axes).
