@@ -35,3 +35,4 @@ run/
 # addon build tooling (machine-specific, see deploy-prism.local.bat.example)
 
 deploy-prism.local.bat
+deploy.local.properties
