@@ -1,5 +1,8 @@
-# Copy to deploy.local.properties (gitignored - machine specific) and fill in.
-# Read by the deploy and runInstance tasks.
+# Where `gradlew deploy` and `gradlew runInstance` find your PrismLauncher instance.
+#
+# Recommended: put these lines ONCE into ~/.gradle/gradle.properties
+# (C:\Users\<you>\.gradle\gradle.properties on Windows) - every addon reads them from there.
+# Copy this file to deploy.local.properties (gitignored) only to override them for one project.
 #
 # ${other_key} references are expanded, so nothing has to be typed twice.
 
@@ -7,7 +10,7 @@
 # (right-click the instance in PrismLauncher -> Instance Folder to confirm).
 prism_instance=26.1.2 - meteor
 
-# PrismLauncher's data folder. mods_dir is derived from this plus the
+# PrismLauncher's data folder. The mods folder is derived from this plus the
 # instance name, so renaming an instance means editing one line.
 prism_root=C:\\Users\\you\\AppData\\Roaming\\PrismLauncher
 

@@ -79,8 +79,12 @@ https://github.com/user-attachments/assets/7e2bc3a1-4222-4728-956b-aa308c9296ab
 ./gradlew tasks --group addon  # everything above, from Gradle itself
 ```
 
-`runInstance` and `deploy` need `deploy.local.properties` - copy
-`deploy.local.properties.example` and fill in your PrismLauncher paths.
+`runInstance` and `deploy` need your PrismLauncher paths - put them once into
+`~/.gradle/gradle.properties` (see `deploy.local.properties.example`), or into a gitignored
+`deploy.local.properties` for this project only.
+
+The build files are shared with the other addons through `dorty-addon-template`, checked out next to
+this project: `./gradlew syncTemplate` pulls them in, `./gradlew checkTemplate` reports drift.
 
 
 ### Version numbering

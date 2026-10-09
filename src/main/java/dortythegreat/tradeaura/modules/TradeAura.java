@@ -18,6 +18,7 @@
 
 package dortythegreat.tradeaura.modules;
 
+import dortythegreat.tradeaura.AddonModule;
 import dortythegreat.tradeaura.inventory.InvHelper;
 import dortythegreat.tradeaura.inventory.MovementControl;
 import dortythegreat.tradeaura.inventory.InventoryManager;
@@ -84,7 +85,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class TradeAura extends Module {
+public class TradeAura extends AddonModule {
 
     private final SettingGroup sgGeneral = settings.getDefaultGroup();
     private final SettingGroup sgAura = settings.createGroup("Aura");
@@ -323,7 +324,6 @@ public class TradeAura extends Module {
 
     @Override
     public Module fromTag(CompoundTag tag) {
-        migrateSettingNames(tag);
         super.fromTag(tag);
         buyRules.clear();
         sellRules.clear();
@@ -590,50 +590,6 @@ public class TradeAura extends Module {
 
     public TradeAura(Category cat) {
         super(cat, "trade-aura", "Trades with villagers for you");
-    }
-
-    /**
-     * Meteor runs every chat message through String.format, so a '%' in an item name (renamed on an
-     * anvil, say) would throw halfway through a tick. Plain messages go through "%s" instead and are
-     * shown verbatim. Calls with format arguments still reach the inherited varargs versions.
-     */
-    public void info(String message) {
-        super.info("%s", message);
-    }
-
-    /** See {@link #info(String)}. */
-    public void warning(String message) {
-        super.warning("%s", message);
-    }
-
-    /**
-     * Setting names used to be capitalised ("Action-delay", "Close"). Meteor looks settings up by
-     * exact name when loading, so without this every renamed setting would silently fall back to its
-     * default. Rewrites stored names to the current spelling before Meteor reads them.
-     */
-    private void migrateSettingNames(CompoundTag moduleTag) {
-        if (!(moduleTag.get("settings") instanceof CompoundTag settingsTag)) return;
-
-        for (Tag groupElement : settingsTag.getListOrEmpty("groups")) {
-            if (!(groupElement instanceof CompoundTag groupTag)) continue;
-
-            SettingGroup group = settings.getGroup(groupTag.getStringOr("name", ""));
-            if (group == null) continue;
-
-            for (Tag settingElement : groupTag.getListOrEmpty("settings")) {
-                if (!(settingElement instanceof CompoundTag settingTag)) continue;
-
-                String stored = settingTag.getStringOr("name", "");
-                if (group.get(stored) != null) continue;
-
-                for (Setting<?> setting : group) {
-                    if (setting.name.equalsIgnoreCase(stored)) {
-                        settingTag.putString("name", setting.name);
-                        break;
-                    }
-                }
-            }
-        }
     }
 
     private final List<Entity> targets = new ArrayList<>();

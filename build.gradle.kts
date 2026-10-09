@@ -114,7 +114,7 @@ val modVersion = gitVersion
  * identifies one exactly. A bug report quoting "dev.a1b2c3d" can be checked
  * out; one quoting "dev.7" cannot.
  */
-val displayName = if (isRelease) {
+val modDisplayName = if (isRelease) {
     prop("mod_name")
 } else {
     "${prop("mod_name")} §edev.${gitHash ?: "unknown"}${if (gitDirty) "d" else ""}§r"
@@ -345,16 +345,20 @@ tasks {
         filteringCharset = "UTF-8"
         dependsOn(syncModMetadata)
 
-        val modName = prop("mod_name")
+        // Copied into locals on purpose: inside filesMatching {} the receiver is a FileCopyDetails,
+        // which has its own `name` and `displayName` ("file 'C:\...\fabric.mod.json'") - a bare
+        // `displayName` there silently resolves to that instead of the value above.
+        val plainName = prop("mod_name")
+        val devName = modDisplayName
         val expandProps = mapOf("version" to modVersion)
         inputs.properties(expandProps)
-        inputs.property("displayName", displayName)
+        inputs.property("modDisplayName", devName)
 
         filesMatching("fabric.mod.json") {
             expand(expandProps)
             // Dev builds are listed as "<name> dev.<hash>" in Fabric's mod list. The committed file
             // keeps the plain name, so the repository always shows the real one.
-            filter { line -> line.replace("\"name\": \"$modName\"", "\"name\": \"$displayName\"") }
+            filter { line -> line.replace("\"name\": \"$plainName\"", "\"name\": \"$devName\"") }
         }
     }
 
@@ -383,10 +387,11 @@ tasks {
 //  follows. Published jars are built by GitHub Actions from the tag, see
 //  .github/workflows/build.yml.
 //
-//  Machine-specific paths live in deploy.local.properties (gitignored):
-//      prism_instance=26.1.2 - meteor
-//      mods_dir=C:\\Users\\you\\AppData\\Roaming\\PrismLauncher\\instances\\...\\mods
-//      prism_exe=C:\\Users\\you\\AppData\\Local\\Programs\\PrismLauncher\\prismlauncher.exe
+//  Machine-specific paths - prism_root, prism_instance, prism_exe, or
+//  mods_dir for a non-standard layout - are Gradle properties. Put them
+//  once into ~/.gradle/gradle.properties and every addon picks them up;
+//  deploy.local.properties (gitignored) overrides them for one project.
+//  See deploy.local.properties.example.
 // =====================================================================
 
 val deployProps = Properties().apply {
@@ -395,21 +400,27 @@ val deployProps = Properties().apply {
 }
 
 /**
- * Reads a deploy property, expanding ${other_key} references.
+ * A deploy setting as written: deploy.local.properties first, then Gradle
+ * properties - which include ~/.gradle/gradle.properties, the one place
+ * to keep the Prism paths for all addons at once.
+ */
+fun rawDeployProp(key: String): String =
+    (deployProps.getProperty(key) ?: findProperty(key)?.toString() ?: "").trim()
+
+/**
+ * Reads a deploy setting, expanding ${other_key} references.
  *
- * java.util.Properties has no interpolation of its own, so this is done
- * here - otherwise the instance name has to be typed twice, once on its
- * own line and once inside the mods path, and the two drift apart the
+ * Neither java.util.Properties nor Gradle interpolate on their own, so this
+ * is done here - otherwise the instance name has to be typed twice, once on
+ * its own line and once inside the mods path, and the two drift apart the
  * first time you rename an instance.
  */
 fun deployProp(key: String): String {
-    var v = deployProps.getProperty(key, "").trim()
+    var v = rawDeployProp(key)
     // Bounded loop rather than recursion: a typo like a=${a} would
     // otherwise hang the build instead of failing it.
     repeat(5) {
-        val next = Regex("""\$\{([^}]+)}""").replace(v) { m ->
-            deployProps.getProperty(m.groupValues[1], "").trim()
-        }
+        val next = Regex("""\$\{([^}]+)}""").replace(v) { m -> rawDeployProp(m.groupValues[1]) }
         if (next == v) return@repeat
         v = next
     }
@@ -450,9 +461,9 @@ fun runCommand(vararg args: String) {
 fun deployAndLaunch() {
     val modsDir = modsDir()
     if (modsDir.isEmpty()) {
-        error("No mods folder. Copy deploy.local.properties.example to " +
-              "deploy.local.properties and set either prism_root + " +
-              "prism_instance, or mods_dir directly.")
+        error("No mods folder. Set prism_root + prism_instance (or mods_dir) in " +
+              "~/.gradle/gradle.properties, or per project in deploy.local.properties - " +
+              "see deploy.local.properties.example.")
     }
 
     val instance = deployProp("prism_instance")
@@ -510,9 +521,9 @@ tasks.register("deploy") {
 // =====================================================================
 if (modsDir().isEmpty()) {
     logger.lifecycle(
-        "[runInstance] Not available: create deploy.local.properties (copy the " +
-        ".example) and set prism_root + prism_instance. `gradlew runClient` " +
-        "works regardless.")
+        "[runInstance] Not available: set prism_root + prism_instance in " +
+        "~/.gradle/gradle.properties (or deploy.local.properties, see the " +
+        ".example). `gradlew runClient` works regardless.")
 } else {
     val gameDir = File(modsDir()).parentFile   // ...\minecraft
     if (!gameDir.isDirectory) {
@@ -593,4 +604,93 @@ if (hasProperty("debug")) {
         }
     }
     logger.lifecycle("[debug] The game will wait for a debugger on port $port.")
+}
+
+
+// =====================================================================
+//  TEMPLATE
+//
+//  The files listed in template-files.txt of dorty-addon-template are the
+//  same in every addon - this build script among them - and must not drift
+//  apart. The template is expected next to this project; point elsewhere
+//  with -PtemplateDir=...
+//
+//      gradlew syncTemplate    copy them from the template into this addon
+//      gradlew checkTemplate   fail if any of them differs from the template
+//
+//  Change a shared file in the template first, then sync it out. Anything
+//  addon-specific belongs in files that are not on the list: gradle.properties,
+//  README.md, CHANGELOG.md, LICENSE-NOTICE, sources, or a .gitignore inside a
+//  subfolder for extra ignores.
+// =====================================================================
+val templateDir = file((findProperty("templateDir") as String?) ?: "../dorty-addon-template")
+
+/** Shared files, as listed by the template. Empty when there is no template. */
+fun templateFiles(): List<String> {
+    val list = File(templateDir, "template-files.txt")
+    if (!list.isFile) return emptyList()
+    return list.readLines().map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith("#") }
+}
+
+/** Contents for comparison - line endings don't count, except in binaries. */
+fun comparable(f: File): ByteArray =
+    if (f.name.endsWith(".jar")) f.readBytes()
+    else f.readBytes().filter { it != '\r'.code.toByte() }.toByteArray()
+
+fun sameAsTemplate(relative: String): Boolean {
+    val inTemplate = File(templateDir, relative)
+    val here = file(relative)
+    return inTemplate.isFile && here.isFile && comparable(inTemplate).contentEquals(comparable(here))
+}
+
+tasks.register("syncTemplate") {
+    group = "addon"
+    description = "Copy the shared files listed in dorty-addon-template/template-files.txt into this addon."
+    doLast {
+        val shared = templateFiles()
+        if (shared.isEmpty()) {
+            throw GradleException("No template at ${templateDir.absolutePath} - clone dorty-addon-template " +
+                "next to this project, or pass -PtemplateDir=...")
+        }
+        if (templateDir.canonicalFile == projectDir.canonicalFile) {
+            logger.lifecycle("This is the template itself - nothing to sync.")
+            return@doLast
+        }
+
+        var updated = 0
+        for (relative in shared) {
+            val source = File(templateDir, relative)
+            if (!source.isFile) {
+                logger.warn("  skipped $relative - listed, but missing from the template")
+                continue
+            }
+            if (sameAsTemplate(relative)) continue
+
+            val target = file(relative)
+            target.parentFile?.mkdirs()
+            source.copyTo(target, overwrite = true)
+            logger.lifecycle("  updated $relative")
+            updated++
+        }
+        logger.lifecycle(if (updated == 0) "Already in sync with the template."
+                         else "$updated file(s) updated from the template - review and commit.")
+    }
+}
+
+tasks.register("checkTemplate") {
+    group = "verification"
+    description = "Fail if a shared file differs from dorty-addon-template (skipped when the template is absent)."
+    doLast {
+        val shared = templateFiles()
+        if (shared.isEmpty()) {
+            logger.lifecycle("checkTemplate: no template at ${templateDir.absolutePath} - skipped.")
+            return@doLast
+        }
+        val drifted = shared.filterNot { sameAsTemplate(it) }
+        if (drifted.isNotEmpty()) {
+            throw GradleException("Differs from the template: ${drifted.joinToString()}. " +
+                "Run ./gradlew syncTemplate, or make the change in the template instead.")
+        }
+        logger.lifecycle("checkTemplate: all ${shared.size} shared files match the template.")
+    }
 }
